@@ -1,0 +1,36 @@
+All fixed and verified. Here's the full breakdown:
+
+🔧 Root causes found & fixed
+
+1.  ClientException  /  SocketException  on phone — the release  AndroidManifest.xml  had no INTERNET permission (debug builds get it merged automatically; release builds don't). The app literally couldn't open sockets. Fixed, and verified inside the built APK:
+
+uses-permission: name='android.permission.INTERNET' ✅
+
+New APK (17.5MB) rebuilt and reinstalled on your phone — sign in with  athlete@sportsphere.app  /  Passw0rd! .
+
+2. Logins failing even on web — the demo users I'd seeded directly into  auth.users  were rejected by Supabase's hosted auth server. I deleted them and recreated all 8 via the official admin API ( scripts/create_demo_users.py ), then re-linked all demo data. Verified via the exact REST endpoint the apps use:
+
+athlete@ → LOGIN OK   coach@ → LOGIN OK   admin@ → LOGIN OK
+SIGNUP OK (session returned immediately)
+
+3. Password visibility + sign-up — added the 👁 toggle on both apps, plus full sign-up (name + role) on web and mobile. Also enabled  mailer_autoconfirm  so sign-ups work instantly with no email verification.
+
+🧪 Proper commands to test the web app
+
+// bash
+cd web
+npm run dev
+
+Then open http://localhost:5173 → sign in as  admin@sportsphere.app  /  Passw0rd!  (admin sees everything; try  athlete@  to see role-based views). Sign-up link is on the same page.
+
+📱 Rebuild the APK anytime
+
+// bash
+cd mobile && export PATH="/c/Users/Naman Gaonkar/flutter/bin:$PATH"
+flutter build apk --release --target-platform android-arm64 \
+  --dart-define=SUPABASE_URL="$(grep '^SUPABASE_URL=' ../.env | cut -d= -f2-)" \
+  --dart-define=SUPABASE_ANON_KEY="$(grep '^SUPABASE_ANON_KEY=' ../.env | cut -d= -f2-)"
+
+✅ All 21 modules — now in the web app
+
+Athlete · Coach · Staff & HR · Attendance & Leave · Payroll (view) · Venues · Housekeeping · Inventory · Vendors & Purchases · Tournaments (School/District/State/National) · Teams & Players · Fixtures/Matches/Results · School Activities · Training & Camps · Performance & Medical · Awards · Events · Transport · Accommodation · Finance & Expenses · Reports & Dashboard + role-based access (Admin sees all, Athlete sees their own data via RLS).

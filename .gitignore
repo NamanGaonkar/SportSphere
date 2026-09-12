@@ -1,0 +1,22 @@
+# --- secrets ---
+.env
+.env.local
+.env.*.local
+
+# --- personal ---
+do not touch.txt
+
+# --- node / web ---
+node_modules/
+web/dist/
+
+# --- flutter / dart ---
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# --- logs / misc ---
+*.log
+.DS_Store
