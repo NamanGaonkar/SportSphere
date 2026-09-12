@@ -1,6 +1,29 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
+import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import InputAdornment from '@mui/material/InputAdornment'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, statusColor, EmptyState } from '../components/ui'
+import { PageHead, EmptyState, LoadingState } from '../components/ui'
+import dataTableSx from '../components/tableSx'
 
 type Coach = {
   id: string
@@ -14,6 +37,8 @@ const empty = { full_name: '', specialization: '' }
 export default function Coaches() {
   const [rows, setRows] = useState<Coach[]>([])
   const [q, setQ] = useState('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [editProfileId, setEditProfileId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...empty })
@@ -21,7 +46,7 @@ export default function Coaches() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('coaches')
@@ -29,9 +54,9 @@ export default function Coaches() {
       .order('created_at')
     setRows((data as unknown as Coach[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const filtered = useMemo(
     () => rows.filter((r) => (r.profile?.full_name ?? '').toLowerCase().includes(q.toLowerCase())),
@@ -43,7 +68,11 @@ export default function Coaches() {
     setError('')
 
     if (editing && editProfileId) {
-      await supabase.from('profiles').update({ full_name: form.full_name }).eq('id', editProfileId)
+      const { error: pErr } = await supabase
+        .from('profiles')
+        .update({ full_name: form.full_name })
+        .eq('id', editProfileId)
+      if (pErr) { setError(pErr.message); return }
       const { error } = await supabase
         .from('coaches')
         .update({ specialization: form.specialization || null })
@@ -84,68 +113,101 @@ export default function Coaches() {
   }
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Coaches"
         sub="Coaching staff and their specializations."
-        action={<button className="btn" onClick={() => { setEditing(null); setEditProfileId(null); setForm({ ...empty }); setShowForm(true) }}>+ Add Coach</button>}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setEditProfileId(null); setForm({ ...empty }); setShowForm(true) }}>
+            Add Coach
+          </Button>
+        }
       />
 
-      <div className="toolbar">
-        <input placeholder="Search by name…" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
+      <TextField
+        size="small"
+        placeholder="Search by name"
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setPage(0) }}
+        sx={{ mb: 2, width: 280 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
 
-      <div className="card">
+      <Paper>
         {loading ? (
-          <div className="muted">Loading…</div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
           <EmptyState text="No coaches found." />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Name</th><th>Specialization</th><th>Teams</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.profile?.full_name ?? '—'}</td>
-                  <td>{r.specialization ?? '—'}</td>
-                  <td className="muted">{(r.teams ?? []).map((t) => t.name).join(', ') || '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn secondary small" onClick={() => openEdit(r)}>Edit</button>{' '}
-                    <button className="btn danger small" onClick={() => remove(r.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Specialization</TableCell>
+                    <TableCell>Teams</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((r) => (
+                      <TableRow key={r.id} hover>
+                        <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
+                        <TableCell>{r.specialization ?? '-'}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{(r.teams ?? []).map((t) => t.name).join(', ') || '-'}</TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => remove(r.id)} aria-label="Delete">
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
+      </Paper>
 
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit Coach' : 'Add Coach'}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                <div className="form-row">
-                  <label>Full name</label>
-                  <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
-                </div>
-                <div className="form-row">
-                  <label>Specialization</label>
-                  <input value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} placeholder="Football" />
-                </div>
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit Coach' : 'Add Coach'}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required fullWidth />
+              <TextField label="Specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} fullWidth />
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

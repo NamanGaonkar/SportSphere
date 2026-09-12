@@ -11,27 +11,27 @@ const athleteSource = { table: 'athletes', select: 'id, profile:profiles(full_na
 const statusCol = (key: string, label: string): ColumnDef => ({
   key,
   label,
-  render: (row) => <Badge color={statusColor(String(row[key] ?? ''))}>{String(row[key] ?? '—')}</Badge>,
+  render: (row) => <Badge color={statusColor(String(row[key] ?? ''))}>{String(row[key] ?? '-')}</Badge>,
 })
 
 const moneyCol = (key: string, label: string): ColumnDef => ({
   key,
   label,
-  render: (row) => (row[key] == null ? '—' : `₹${Number(row[key]).toLocaleString('en-IN')}`),
+  render: (row) => (row[key] == null ? '-' : `Rs ${Number(row[key]).toLocaleString('en-IN')}`),
 })
 
 export function Purchases() {
   const fields: FieldDef[] = [
     { key: 'vendor_id', label: 'Vendor', type: 'select', source: vendorSource },
     { key: 'status', label: 'Status', type: 'select', options: ['Draft', 'Ordered', 'Received', 'Cancelled'] },
-    { key: 'total', label: 'Total (₹)', type: 'number' },
+    { key: 'total', label: 'Total (INR)', type: 'number' },
     { key: 'items', label: 'Items (JSON: [{"name","qty","price"}])', type: 'textarea', fullWidth: true },
   ]
   const columns: ColumnDef[] = [
     { key: 'vendor_id', label: 'Vendor' },
     { key: 'items', label: 'Items', render: (r) => {
         const items = Array.isArray(r.items) ? r.items as { name: string; qty: number }[] : []
-        return items.map((i) => `${i.name} ×${i.qty}`).join(', ') || '—'
+        return items.map((i) => `${i.name} x${i.qty}`).join(', ') || '-'
       } },
     moneyCol('total', 'Total'),
     statusCol('status', 'Status'),
@@ -74,7 +74,7 @@ export function Training() {
     { key: 'type', label: 'Type' },
     { key: 'sport', label: 'Sport' },
     { key: 'coach_id', label: 'Coach' },
-    { key: 'start_time', label: 'When', render: (r) => r.start_time ? new Date(String(r.start_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—' },
+    { key: 'start_time', label: 'When', render: (r) => r.start_time ? new Date(String(r.start_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-' },
   ]
   return <CrudPage title="Training & Camps" sub="Training sessions and residential camps." table="training_sessions" columns={columns} fields={fields} searchKeys={['title', 'sport']} />
 }
@@ -94,7 +94,7 @@ export function Performance() {
     { key: 'value', label: 'Value' },
     { key: 'notes', label: 'Notes' },
   ]
-  return <CrudPage title="Athlete Performance" sub="Measured metrics: sprints, jumps, endurance, etc." table="performance_records" columns={columns} fields={fields} searchKeys={['metric', 'value']} />
+  return <CrudPage title="Athlete Performance" sub="Measured metrics: sprints, jumps, endurance and more." table="performance_records" columns={columns} fields={fields} searchKeys={['metric', 'value']} />
 }
 
 export function Medical() {
@@ -109,7 +109,7 @@ export function Medical() {
     { key: 'athlete_id', label: 'Athlete' },
     { key: 'type', label: 'Type' },
     { key: 'details', label: 'Details' },
-    { key: 'cleared', label: 'Cleared', render: (r) => <Badge color={r.cleared ? 'green' : 'red'}>{r.cleared ? 'Cleared' : 'Not cleared'}</Badge> },
+    { key: 'cleared', label: 'Cleared', render: (r) => <Badge color={r.cleared ? 'success' : 'error'}>{r.cleared ? 'Cleared' : 'Not cleared'}</Badge> },
     { key: 'date', label: 'Date' },
   ]
   return <CrudPage title="Athlete Medical" sub="Checkups, injuries, physio and clearances." table="medical_records" columns={columns} fields={fields} searchKeys={['details']} />
@@ -146,10 +146,10 @@ export function Transport() {
     { key: 'purpose', label: 'Purpose' },
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'driver', label: 'Driver' },
-    { key: 'depart_at', label: 'Departure', render: (r) => r.depart_at ? new Date(String(r.depart_at)).toLocaleString() : '—' },
+    { key: 'depart_at', label: 'Departure', render: (r) => r.depart_at ? new Date(String(r.depart_at)).toLocaleString() : '-' },
     statusCol('status', 'Status'),
   ]
-  return <CrudPage title="Transport" sub="Team travel — buses, vehicles, drivers." table="transport" columns={columns} fields={fields} searchKeys={['purpose', 'vehicle', 'driver']} />
+  return <CrudPage title="Transport" sub="Team travel - buses, vehicles, drivers." table="transport" columns={columns} fields={fields} searchKeys={['purpose', 'vehicle', 'driver']} />
 }
 
 export function Accommodation() {
@@ -176,7 +176,7 @@ export function Accommodation() {
 export function Expenses() {
   const fields: FieldDef[] = [
     { key: 'category', label: 'Category', type: 'select', options: ['Equipment', 'Travel', 'Salaries', 'Venue', 'Other'], required: true },
-    { key: 'amount', label: 'Amount (₹)', type: 'number', required: true },
+    { key: 'amount', label: 'Amount (INR)', type: 'number', required: true },
     { key: 'date', label: 'Date', type: 'date' },
     { key: 'description', label: 'Description', type: 'textarea', fullWidth: true },
     { key: 'approved_by', label: 'Approved by' },

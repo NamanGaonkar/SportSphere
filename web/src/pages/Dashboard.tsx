@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { StatCard, Section, Badge, statusColor, EmptyState } from '../components/ui'
+import { StatCard, Section, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
+import Box from '@mui/material/Box'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
+import { palette } from '../theme'
 
 type Counts = { athletes: number; coaches: number; teams: number; tournaments: number }
 type MatchRow = {
@@ -17,6 +25,7 @@ type MatchRow = {
   tournaments: { name: string } | null
 }
 
+// Dashboard metrics are shared with the mobile app (same stats, same order).
 export default function Dashboard() {
   const [counts, setCounts] = useState<Counts>({ athletes: 0, coaches: 0, teams: 0, tournaments: 0 })
   const [matches, setMatches] = useState<MatchRow[]>([])
@@ -66,73 +75,85 @@ export default function Dashboard() {
     load()
   }, [])
 
-  const fmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'
+  if (loading) return <LoadingState />
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Dashboard</h1>
-          <p>Organization overview — people, competitions and operations at a glance.</p>
-        </div>
-      </div>
+    <Box>
+      {/* Stat cards: equal width, equal 16px gaps on every breakpoint */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <StatCard label="Athletes" value={counts.athletes} sub="Active roster" />
+        <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" />
+        <StatCard label="Teams" value={counts.teams} sub="Registered squads" />
+        <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" />
+      </Box>
 
-      {loading ? (
-        <div className="muted">Loading…</div>
-      ) : (
-        <>
-          <div className="cards">
-            <StatCard label="Athletes" value={counts.athletes} sub="Active roster" />
-            <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" />
-            <StatCard label="Teams" value={counts.teams} sub="Registered squads" />
-            <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" />
-          </div>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 2,
+        }}
+      >
+        <Section title="Recent Matches">
+          {matches.length === 0 ? (
+            <EmptyState text="No matches scheduled yet." />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Match</TableCell>
+                    <TableCell>Tournament</TableCell>
+                    <TableCell>Score</TableCell>
+                    <TableCell>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {matches.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</TableCell>
+                      <TableCell sx={{ color: 'text.secondary' }}>{m.tournaments?.name ?? '-'}</TableCell>
+                      <TableCell>{m.score_a ?? 0} : {m.score_b ?? 0}</TableCell>
+                      <TableCell><Badge color={statusColor(m.status)}>{m.status}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Section>
 
-          <div className="grid-2">
-            <Section title="Live & Recent Matches">
-              {matches.length === 0 ? (
-                <EmptyState text="No matches yet." />
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr><th>Match</th><th>Tournament</th><th>Score</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {matches.map((m) => (
-                      <tr key={m.id}>
-                        <td>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</td>
-                        <td className="muted">{m.tournaments?.name ?? '—'}</td>
-                        <td>{m.score_a ?? 0} – {m.score_b ?? 0}</td>
-                        <td><Badge color={statusColor(m.status)}>{m.status}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Section>
-
-            <Section title="Attendance — Last 7 Days (%)">
-              {attendance.length === 0 ? (
-                <EmptyState text="No attendance recorded yet." />
-              ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={attendance}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2a3550" />
-                    <XAxis dataKey="day" stroke="#93a0b8" fontSize={12} />
-                    <YAxis stroke="#93a0b8" fontSize={12} domain={[0, 100]} />
-                    <Tooltip
-                      contentStyle={{ background: '#1e2740', border: '1px solid #2a3550', borderRadius: 8 }}
-                      labelStyle={{ color: '#e8ecf4' }}
-                    />
-                    <Bar dataKey="present" fill="#4f7cff" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </Section>
-          </div>
-        </>
-      )}
-    </div>
-    )
+        <Section title="Attendance - Last 7 Days (%)">
+          {attendance.length === 0 ? (
+            <EmptyState text="No attendance recorded yet." />
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={attendance}>
+                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
+                <XAxis dataKey="day" stroke={palette.textMuted} fontSize={12} tickLine={false} />
+                <YAxis stroke={palette.textMuted} fontSize={12} domain={[0, 100]} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: palette.surface,
+                    border: `1px solid ${palette.border}`,
+                    borderRadius: 10,
+                    fontFamily: 'Lato, sans-serif',
+                  }}
+                  labelStyle={{ color: palette.black, fontWeight: 700 }}
+                />
+                <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Section>
+      </Box>
+    </Box>
+  )
 }

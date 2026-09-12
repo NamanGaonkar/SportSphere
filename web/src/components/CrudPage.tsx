@@ -1,7 +1,33 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Checkbox from '@mui/material/Checkbox'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TablePagination from '@mui/material/TablePagination'
+import TableRow from '@mui/material/TableRow'
+import Alert from '@mui/material/Alert'
+import InputAdornment from '@mui/material/InputAdornment'
+import IconButton from '@mui/material/IconButton'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
-import { PageHead, EmptyState } from './ui'
+import { PageHead, EmptyState, LoadingState } from './ui'
+import dataTableSx from './tableSx'
 
 export type FieldDef = {
   key: string
@@ -53,20 +79,22 @@ export default function CrudPage({
   const [rows, setRows] = useState<Record<string, unknown>[]>([])
   const [sources, setSources] = useState<Record<string, Option[]>>({})
   const [q, setQ] = useState('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase.from(table).select('*').order(orderBy, { ascending: false })
     setRows(((data ?? []) as unknown) as Record<string, unknown>[])
     setLoading(false)
-  }
+  }, [table, orderBy])
 
-  async function loadSources() {
+  const loadSources = useCallback(async () => {
     const next: Record<string, Option[]> = {}
     for (const f of fields) {
       if (!f.source) continue
@@ -75,18 +103,18 @@ export default function CrudPage({
       next[f.key] = (((data ?? []) as unknown) as Record<string, unknown>[]).map((r) => ({
         value: String(r[s.valueKey ?? 'id']),
         label: String(
-          s.labelPath.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], r) ?? '—',
+          s.labelPath.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], r) ?? '-',
         ),
       }))
     }
     setSources(next)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields])
 
   useEffect(() => {
     load()
     loadSources()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [load, loadSources])
 
   const filtered = useMemo(() => {
     if (!q || searchKeys.length === 0) return rows
@@ -99,7 +127,7 @@ export default function CrudPage({
   function openAdd() {
     const init: Record<string, unknown> = {}
     for (const f of fields) {
-      init[f.key] = f.type === 'checkbox' ? false : f.type === 'number' ? '' : ''
+      init[f.key] = f.type === 'checkbox' ? false : ''
     }
     setForm(init)
     setEditing(null)
@@ -160,7 +188,7 @@ export default function CrudPage({
     if (f.type === 'checkbox') return v ? 'Yes' : 'No'
     if (f.type === 'select' && f.source) {
       const opt = (sources[f.key] ?? []).find((o) => o.value === String(v))
-      return opt?.label ?? '—'
+      return opt?.label ?? '-'
     }
     if (f.type === 'datetime-local' && v) {
       return new Date(String(v)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -168,109 +196,153 @@ export default function CrudPage({
     if (f.type === 'date' && v) {
       return new Date(String(v) + 'T00:00:00').toLocaleDateString()
     }
-    if (v === null || v === undefined || v === '') return '—'
+    if (v === null || v === undefined || v === '') return '-'
     return String(v)
   }
 
   return (
-    <div>
+    <Box>
       <PageHead
         title={title}
         sub={sub}
-        action={<button className="btn" onClick={openAdd}>+ Add</button>}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+            Add
+          </Button>
+        }
       />
 
       {searchKeys.length > 0 && (
-        <div className="toolbar">
-          <input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
+        <TextField
+          size="small"
+          placeholder="Search"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setPage(0) }}
+          sx={{ mb: 2, width: 280 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
       )}
 
-      <div className="card">
+      <Paper sx={{ mb: 2 }}>
         {loading ? (
-          <div className="muted">Loading…</div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
-          <EmptyState text="Nothing here yet — use + Add to create the first record." />
+          <EmptyState text="No records yet. Use the Add button to create the first one." />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {columns.map((c) => <th key={c.key}>{c.label}</th>)}
-                  <th style={{ textAlign: 'right' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr key={String(row.id)}>
-                    {columns.map((c) => (
-                      <td key={c.key}>
-                        {c.render ? c.render(row) : displayValue(fields.find((f) => f.key === c.key) ?? { key: c.key, label: c.label }, row)}
-                      </td>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {columns.map((c) => <TableCell key={c.key}>{c.label}</TableCell>)}
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((row) => (
+                      <TableRow key={String(row.id)} hover>
+                        {columns.map((c) => (
+                          <TableCell key={c.key}>
+                            {c.render ? c.render(row) : displayValue(fields.find((f) => f.key === c.key) ?? { key: c.key, label: c.label }, row)}
+                          </TableCell>
+                        ))}
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit">
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => remove(String(row.id))} aria-label="Delete">
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                    <td style={{ textAlign: 'right' }}>
-                      <button className="btn secondary small" onClick={() => openEdit(row)}>Edit</button>{' '}
-                      <button className="btn danger small" onClick={() => remove(String(row.id))}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
+      </Paper>
 
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit' : 'Add'} — {title}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                {fields.map((f) => (
-                  <div className="form-row" key={f.key} style={f.fullWidth ? { gridColumn: '1 / -1' } : undefined}>
-                    <label>{f.label}</label>
-                    {f.type === 'textarea' ? (
-                      <textarea
-                        value={String(form[f.key] ?? '')}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                        rows={2}
-                      />
-                    ) : f.type === 'select' ? (
-                      <select
-                        value={String(form[f.key] ?? '')}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                      >
-                        <option value="">— none —</option>
-                        {(f.options ?? []).map((o) => <option key={o}>{o}</option>)}
-                        {(sources[f.key] ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    ) : f.type === 'checkbox' ? (
-                      <input
-                        type="checkbox"
-                        checked={Boolean(form[f.key])}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })}
-                        style={{ width: 18, height: 18 }}
-                      />
-                    ) : (
-                      <input
-                        type={f.type ?? 'text'}
-                        value={String(form[f.key] ?? '')}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                        required={f.required}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit' : 'Add'} - {title}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              {fields.map((f) => (
+                <Box key={f.key} sx={{ gridColumn: f.fullWidth ? '1 / -1' : undefined }}>
+                  {f.type === 'checkbox' ? (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(form[f.key])}
+                          onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })}
+                        />
+                      }
+                      label={f.label}
+                    />
+                  ) : f.type === 'textarea' ? (
+                    <TextField
+                      label={f.label}
+                      multiline
+                      minRows={2}
+                      value={String(form[f.key] ?? '')}
+                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                      fullWidth
+                      required={f.required}
+                    />
+                  ) : f.type === 'select' ? (
+                    <TextField
+                      select
+                      label={f.label}
+                      value={String(form[f.key] ?? '')}
+                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                      fullWidth
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {(f.options ?? []).map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+                      {(sources[f.key] ?? []).map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                    </TextField>
+                  ) : (
+                    <TextField
+                      type={f.type ?? 'text'}
+                      label={f.label}
+                      value={String(form[f.key] ?? '')}
+                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                      fullWidth
+                      required={f.required}
+                      slotProps={f.type === 'date' || f.type === 'datetime-local' ? { inputLabel: { shrink: true } } : undefined}
+                    />
+                  )}
+                </Box>
+              ))}
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

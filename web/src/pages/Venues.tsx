@@ -1,6 +1,21 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import Typography from '@mui/material/Typography'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, statusColor, EmptyState } from '../components/ui'
+import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 
 type Venue = {
   id: string
@@ -21,7 +36,7 @@ export default function Venues() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('venues')
@@ -29,11 +44,9 @@ export default function Venues() {
       .order('name')
     setRows((data as unknown as Venue[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
-
-  const filtered = useMemo(() => rows, [rows])
+  useEffect(() => { load() }, [load])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -67,66 +80,72 @@ export default function Venues() {
   }
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Venues"
         sub="Grounds, arenas and facilities."
-        action={<button className="btn" onClick={() => { setEditing(null); setForm({ ...empty }); setShowForm(true) }}>+ Add Venue</button>}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setForm({ ...empty }); setShowForm(true) }}>
+            Add Venue
+          </Button>
+        }
       />
 
-      <div className="cards">
-        {rows.map((v) => (
-          <div className="card" key={v.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>{v.name}</h3>
-              <Badge color={statusColor(v.status)}>{v.status}</Badge>
-            </div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{v.location ?? '—'}</div>
-            <div style={{ fontSize: 13, marginTop: 8 }}>Capacity: {v.capacity?.toLocaleString() ?? '—'}</div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <button className="btn secondary small" onClick={() => openEdit(v)}>Edit</button>
-              <button className="btn danger small" onClick={() => remove(v.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {rows.length === 0 && !loading && <EmptyState text="No venues yet." />}
-
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit Venue' : 'Add Venue'}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                <div className="form-row">
-                  <label>Name</label>
-                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                </div>
-                <div className="form-row">
-                  <label>Location</label>
-                  <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>Capacity</label>
-                  <input type="number" min={0} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    {['Active', 'Maintenance', 'Closed'].map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {loading ? (
+        <LoadingState />
+      ) : rows.length === 0 ? (
+        <Paper><EmptyState text="No venues yet." /></Paper>
+      ) : (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+            gap: 2,
+          }}
+        >
+          {rows.map((v) => (
+            <Paper key={v.id} sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6">{v.name}</Typography>
+                <Badge color={statusColor(v.status)}>{v.status}</Badge>
+              </Box>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{v.location ?? '-'}</Typography>
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Capacity: {v.capacity?.toLocaleString() ?? '-'} - Bookings: {v.venue_bookings?.[0]?.count ?? 0}
+              </Typography>
+              <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <IconButton size="small" onClick={() => openEdit(v)} aria-label="Edit">
+                  <EditOutlinedIcon fontSize="small" />
+                </IconButton>
+                <IconButton size="small" color="error" onClick={() => remove(v.id)} aria-label="Delete">
+                  <DeleteOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
       )}
-    </div>
+
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit Venue' : 'Add Venue'}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
+              <TextField label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} fullWidth />
+              <TextField type="number" label="Capacity" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} fullWidth />
+              <TextField select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
+                {['Active', 'Maintenance', 'Closed'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              </TextField>
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

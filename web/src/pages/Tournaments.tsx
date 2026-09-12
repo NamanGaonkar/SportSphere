@@ -1,6 +1,28 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
+import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, EmptyState } from '../components/ui'
+import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
+import dataTableSx from '../components/tableSx'
 
 type Tournament = {
   id: string
@@ -15,18 +37,20 @@ type Tournament = {
 const empty = { name: '', level: 'School', start_date: '', end_date: '', venue_id: '' }
 
 const levelColor = (l: string) =>
-  l === 'National' ? 'red' : l === 'State' ? 'amber' : l === 'District' ? 'blue' : 'green'
+  l === 'National' ? 'error' : l === 'State' ? 'warning' : l === 'District' ? 'info' : 'success'
 
 export default function Tournaments() {
   const [rows, setRows] = useState<Tournament[]>([])
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([])
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({ ...empty })
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const [tr, vn] = await Promise.all([
       supabase.from('tournaments').select('*, venues(name), matches(count)').order('start_date', { ascending: false }),
@@ -35,14 +59,11 @@ export default function Tournaments() {
     setRows((tr.data as unknown as Tournament[]) ?? [])
     setVenues((vn.data as { id: string; name: string }[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
-  const filtered = useMemo(
-    () => [...rows].sort((a, b) => a.name.localeCompare(b.name)),
-    [rows],
-  )
+  const sorted = useMemo(() => [...rows].sort((a, b) => a.name.localeCompare(b.name)), [rows])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -82,86 +103,99 @@ export default function Tournaments() {
     setShowForm(true)
   }
 
-  const fmt = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString() : '—')
+  const fmt = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString() : '-')
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Tournaments"
-        sub="Competitions across School / District / State / National levels."
-        action={<button className="btn" onClick={() => { setEditing(null); setForm({ ...empty }); setShowForm(true) }}>+ Add Tournament</button>}
+        sub="Competitions across School, District, State and National levels."
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setForm({ ...empty }); setShowForm(true) }}>
+            Add Tournament
+          </Button>
+        }
       />
 
-      <div className="card">
+      <Paper>
         {loading ? (
-          <div className="muted">Loading…</div>
-        ) : filtered.length === 0 ? (
+          <LoadingState />
+        ) : sorted.length === 0 ? (
           <EmptyState text="No tournaments yet." />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Name</th><th>Level</th><th>Dates</th><th>Venue</th><th>Matches</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.name}</td>
-                  <td><Badge color={levelColor(t.level)}>{t.level}</Badge></td>
-                  <td className="muted">{fmt(t.start_date)} → {fmt(t.end_date)}</td>
-                  <td>{t.venues?.name ?? '—'}</td>
-                  <td>{t.matches?.[0]?.count ?? 0}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn secondary small" onClick={() => openEdit(t)}>Edit</button>{' '}
-                    <button className="btn danger small" onClick={() => remove(t.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Level</TableCell>
+                    <TableCell>Dates</TableCell>
+                    <TableCell>Venue</TableCell>
+                    <TableCell>Matches</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sorted
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((t) => (
+                      <TableRow key={t.id} hover>
+                        <TableCell>{t.name}</TableCell>
+                        <TableCell><Badge color={levelColor(t.level)}>{t.level}</Badge></TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{fmt(t.start_date)} to {fmt(t.end_date)}</TableCell>
+                        <TableCell>{t.venues?.name ?? '-'}</TableCell>
+                        <TableCell>{t.matches?.[0]?.count ?? 0}</TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton size="small" onClick={() => openEdit(t)} aria-label="Edit">
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => remove(t.id)} aria-label="Delete">
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={sorted.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
+      </Paper>
 
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit Tournament' : 'Add Tournament'}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                <div className="form-row">
-                  <label>Name</label>
-                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                </div>
-                <div className="form-row">
-                  <label>Level</label>
-                  <select value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
-                    {['School', 'District', 'State', 'National'].map((l) => <option key={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Start date</label>
-                  <input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>End date</label>
-                  <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>Venue</label>
-                  <select value={form.venue_id} onChange={(e) => setForm({ ...form, venue_id: e.target.value })}>
-                    <option value="">— none —</option>
-                    {venues.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit Tournament' : 'Add Tournament'}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
+              <TextField select label="Level" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} fullWidth>
+                {['School', 'District', 'State', 'National'].map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+              </TextField>
+              <TextField type="date" label="Start date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField type="date" label="End date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField select label="Venue" value={form.venue_id} onChange={(e) => setForm({ ...form, venue_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {venues.map((v) => <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>)}
+              </TextField>
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

@@ -57,7 +57,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             TextButton(
               onPressed: _markAllRead,
               child: Text('Mark all read ($unread)',
-                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF4F7CFF))),
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFFFF6A13))),
             ),
         ],
       ),
@@ -67,12 +67,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
               onRefresh: _load,
               child: _items.isEmpty
                   ? ListView(
-                      children: const [
+                      children: [
                         Padding(
-                          padding: EdgeInsets.all(40),
-                          child: Center(
-                            child: Text('No notifications yet.',
-                                style: TextStyle(color: Colors.white54)),
+                          padding: const EdgeInsets.all(40),
+                          child: Column(
+                            children: [
+                              Icon(Icons.notifications_none,
+                                  size: 40, color: Colors.black.withValues(alpha: 0.25)),
+                              const SizedBox(height: 12),
+                              Text('No notifications yet.',
+                                  style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                            ],
                           ),
                         ),
                       ],
@@ -80,50 +85,46 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: _items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, i) {
                         final n = _items[i];
                         final read = n['read'] == true;
                         final created = DateTime.tryParse(n['created_at'].toString())?.toLocal();
-                        return Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: read ? const Color(0xFF171E2E) : const Color(0xFF1E2740),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: read ? const Color(0xFF2A3550) : const Color(0xFF4F7CFF),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                read ? Icons.notifications_none : Icons.notifications_active,
-                                size: 20,
-                                color: read ? Colors.white38 : const Color(0xFF4F7CFF),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      n['message'].toString(),
-                                      style: TextStyle(
-                                          fontSize: 13.5,
-                                          color: read ? Colors.white60 : Colors.white),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      created != null
-                                          ? '${created.day}/${created.month} · ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}'
-                                          : '',
-                                      style: const TextStyle(fontSize: 11, color: Colors.white38),
-                                    ),
-                                  ],
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  read ? Icons.notifications_none : Icons.notifications_active,
+                                  size: 20,
+                                  color: read ? Colors.black26 : const Color(0xFFFF6A13),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        n['message'].toString(),
+                                        style: TextStyle(
+                                            fontSize: 13.5,
+                                            color: read ? Colors.black45 : Colors.black),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        created != null
+                                            ? "${created.day}/${created.month} - ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}"
+                                            : '',
+                                        style: TextStyle(
+                                            fontSize: 11, color: Colors.black.withValues(alpha: 0.35)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },

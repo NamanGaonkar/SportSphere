@@ -45,7 +45,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _signOut() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -66,51 +69,57 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 8),
                   CircleAvatar(
                     radius: 38,
-                    backgroundColor: const Color(0xFF1E2740),
+                    backgroundColor: const Color(0xFFFF6A13).withValues(alpha: 0.12),
                     child: Text(
-                      (p?['full_name'] ?? '?').toString().isNotEmpty
+                      (p?['full_name'] ?? '').toString().isNotEmpty
                           ? (p?['full_name']).toString().substring(0, 1).toUpperCase()
                           : '?',
-                      style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF4F7CFF)),
+                      style: const TextStyle(
+                          fontSize: 30, fontWeight: FontWeight.w700, color: Color(0xFFFF6A13)),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Center(
-                    child: Text((p?['full_name'] ?? '—').toString(),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    child: Text((p?['full_name'] ?? '-').toString(),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                   ),
                   Center(
-                    child: Text(email, style: const TextStyle(fontSize: 13, color: Colors.white54)),
+                    child: Text(email,
+                        style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.45))),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4F7CFF).withValues(alpha: 0.18),
+                        color: const Color(0xFFFF6A13).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text((p?['role'] ?? '').toString(),
                           style: const TextStyle(
-                              fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF4F7CFF))),
+                              fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFFF6A13))),
                     ),
                   ),
                   const SizedBox(height: 24),
                   if (a != null) ...[
-                    _tile(Icons.sports_soccer, 'Sport', (a['sport'] ?? '—').toString()),
-                    _tile(Icons.groups, 'Team', ((((a['teams'] ?? {}) as Map)['name']) ?? '—').toString()),
-                    _tile(Icons.cake, 'Date of birth', (a['dob'] ?? '—').toString()),
+                    _tile(Icons.sports_soccer, 'Sport', (a['sport'] ?? '-').toString()),
+                    _tile(Icons.groups, 'Team', ((((a['teams'] ?? {}) as Map)['name']) ?? '-').toString()),
+                    _tile(Icons.cake, 'Date of birth', (a['dob'] ?? '-').toString()),
                     _tile(Icons.medical_services_outlined, 'Medical notes',
                         (a['medical_notes'] ?? 'None').toString()),
                   ] else ...[
-                    _tile(Icons.badge_outlined, 'Contact', (p?['contact_info'] ?? '—').toString()),
+                    _tile(Icons.badge_outlined, 'Contact', (p?['contact_info'] ?? '-').toString()),
                   ],
                   const SizedBox(height: 28),
-                  FilledButton.icon(
+                  OutlinedButton.icon(
                     onPressed: _signOut,
                     icon: const Icon(Icons.logout),
                     label: const Text('Sign out'),
-                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFC62828),
+                      side: const BorderSide(color: Color(0xFFC62828)),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                   ),
                 ],
               ),
@@ -119,29 +128,26 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _tile(IconData icon, String label, String value) {
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF171E2E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3550)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: const Color(0xFF4F7CFF)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 11.5, color: Colors.white38)),
-                const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 14)),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFFFF6A13)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 11.5, color: Colors.black.withValues(alpha: 0.4))),
+                  const SizedBox(height: 2),
+                  Text(value, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

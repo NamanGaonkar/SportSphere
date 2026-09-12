@@ -4,105 +4,78 @@ Sports-organization management platform — one shared Supabase backend, two fro
 
 | App | Stack | For | Folder |
 |---|---|---|---|
-| **Web admin** | React + Vite + TypeScript + Recharts | Admin / Staff / HR | `web/` |
-| **Mobile app** | Flutter (Android) | Coaches / Athletes | `mobile/` |
+| **Web admin** | React + Vite + TypeScript + MUI (Material) + Recharts | Admin / Staff / HR | `web/` |
+| **Mobile app** | Flutter (Android) with Material 3 | Coaches / Athletes | `mobile/` |
 | **Database** | Supabase (Postgres + Auth + RLS) | both | `supabase/` |
+
+Design system (shared across web, mobile and email): **Lato** font, orange `#FF6A13`,
+hover orange `#FF8A42`, black `#0D0D0D`, background `#FAFAF8`, 8/16/24/32 spacing grid.
+No emojis anywhere in the UI.
 
 ---
 
-## 1. Environment (already configured)
-
-All secrets live in the **root `.env`** (gitignored). Fields:
+## 1. Environment (root `.env`, gitignored)
 
 ```
-SUPABASE_URL=            # project URL
-SUPABASE_ANON_KEY=       # anon public key
-SUPABASE_ACCESS_TOKEN=   # management token (DB pushes via CLI/API)
-VITE_SUPABASE_URL=...    # auto-forwarded, do not edit
-VITE_SUPABASE_ANON_KEY=...
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_ACCESS_TOKEN=...   # for management API scripts
+ADMIN_EMAIL=...             # single admin account
+ADMIN_PASSWORD=...
 ```
 
-`.env.example` is the committed template. `do not touch.txt` is also gitignored.
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` lines at the bottom forward credentials
+to the web app. The mobile app receives them at build time via `--dart-define`.
 
-- **Project ref:** `bkozdelbgxezaewoxwqs` (SportsSphere, Singapore)
-- **CLI linked:** `supabase/` → this project
+## 2. Auth model
 
-## 2. Database
+- **One fixed admin account.** Create/reset it with `python scripts/create_admin.py`
+  (uses `ADMIN_EMAIL` + `ADMIN_PASSWORD` from `.env`).
+- Public signup offers only: Athlete, Coach, HR, Finance, VenueManager.
+  The signup trigger (`supabase/branding.sql`) force-demotes any 'Admin' request,
+  and a DB trigger blocks self-assigning Admin even directly.
+- Admin can be granted only from the SQL editor:
+  `update public.profiles set role='Admin' where id=(select id from auth.users where email='...');`
+- Email templates are branded (black/orange/Lato) in `supabase/email_templates/`,
+  applied to the project via `python scripts/apply_email_templates.py`.
 
-Schema lives in three files, **all already applied** to the project:
+## 3. Database
 
-| File | Contents |
-|---|---|
-| `supabase/schema.sql` | Core tables (people, teams, tournaments, matches, venues, attendance…), RLS, signup trigger |
-| `supabase/modules.sql` | Phase 2/3 tables: purchases, housekeeping, training, performance, medical, events, transport, accommodation, expenses, school activities |
-| `supabase/seed.sql` / `modules_seed.sql` | Demo data |
-| `supabase/relink.sql` | One-off fix that linked demo data to real auth users |
+- `supabase/schema.sql` — core tables, RLS, signup trigger.
+- `supabase/modules.sql` — Phase 2/3 module tables.
+- `supabase/branding.sql` — signup-role hardening + admin protection.
+- `scripts/cleanup_demo_data.py` — wipes all rows + auth users (production reset).
 
-To re-apply after edits:
+Both apps read/write the same live Supabase tables. There is no seed/demo data,
+no mock datasets, and no cached duplicates anywhere.
 
-```bash
-TOKEN=$(grep -o 'sbp_[a-f0-9]*' .env | head -1)
-python -c "import json;print(json.dumps({'query': open('supabase/schema.sql', encoding='utf-8').read()}))" > /tmp/p.json
-curl -s -X POST "https://api.supabase.com/v1/projects/bkozdelbgxezaewoxwqs/database/query" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @/tmp/p.json
-# repeat for the other .sql files
-```
-
-**Auth notes (important):**
-- Demo users are created via the **official admin API** (`scripts/create_demo_users.py`) — do NOT insert into `auth.users` directly; hosted GoTrue rejects those rows.
-- `mailer_autoconfirm` is ON → sign-ups work instantly with no email verification (perfect for the demo).
-- Demo accounts (password `Passw0rd!`): `admin@`, `coach@`, `coach2@`, `athlete@`, `athlete2@`, `athlete3@`, `athlete4@`, `hr@` — all `@sportsphere.app`.
-
-## 3. Web app
+## 4. Run the web app
 
 ```bash
 cd web
-npm install        # first time only
-npm run dev        # dev server
-npx tsc -b         # typecheck
-npx vite build     # production build → dist/
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # typecheck + production build
 ```
 
-Reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from root `.env`.
-
-Modules: Dashboard, Reports (charts), Athletes, Coaches, Teams, Staff & HR,
-Tournaments, Fixtures & Results (live score editing), Venues, Attendance &
-Leave (daily marking), Inventory, Vendors & Purchases, Housekeeping,
-Finance & Expenses, Training & Camps, School Activities, Events, Transport,
-Accommodation, Athlete Performance, Athlete Medical — **all 21 modules**.
-
-## 4. Mobile app (per the Android build playbook)
+## 5. Build + install the mobile app
 
 ```bash
-cd mobile
 export PATH="/c/Users/Naman Gaonkar/flutter/bin:$PATH"
-
-flutter analyze                                   # must be clean
-
+cd mobile
+flutter analyze
 flutter build apk --release --target-platform android-arm64 \
-  --dart-define=SUPABASE_URL="https://bkozdelbgxezaewoxwqs.supabase.co" \
-  --dart-define=SUPABASE_ANON_KEY="<anon key from .env>"
-# → build/app/outputs/flutter-apk/app-release.apk (~17.5MB)
-```
+  --dart-define=SUPABASE_URL="$(grep '^SUPABASE_URL=' ../.env | cut -d= -f2-)" \
+  --dart-define=SUPABASE_ANON_KEY="$(grep '^SUPABASE_ANON_KEY=' ../.env | cut -d= -f2-)"
 
-Install on USB-connected phone:
-
-```bash
 ADB="/c/Users/Naman Gaonkar/AppData/Local/Android/Sdk/platform-tools/adb.exe"
-"$ADB" devices                                                    # must show "device"
 "$ADB" install -r build/app/outputs/flutter-apk/app-release.apk
 "$ADB" shell am start -n com.sportsphere.sportsphere/.MainActivity
 ```
 
-Screens: Home (profile + next match), Schedule (fixtures/results),
-Attendance (mark today + 14-day history), Alerts (notification center),
-Profile (details + sign out).
-
-## 5. Build status (as of today)
-
-- [x] Supabase: schema + RLS + all module tables applied; logins verified via REST
-- [x] Sign-up works on web and mobile (autoconfirm enabled, no email round-trip)
-- [x] Release APK has INTERNET permission (root cause of the earlier SocketException — fixed)
-- [x] Web: typecheck clean, production build OK, all 21 modules
-- [x] Flutter: analyze clean, APK rebuilt (17.5MB) and installed on phone
-- [ ] Optional next: push notifications, storage buckets for athlete documents
+Notes (this PC):
+- The fake-NDK workaround (`llvm-strip`/`llvm-objcopy` + `strip_elf.py`) lives in the
+  SDK folders, outside this repo — keep it intact or release builds fail on strip steps.
+- Lato is bundled as TTFs (`mobile/assets/fonts/`), not fetched at runtime.
+- The dashboard metrics (Athletes / Coaches / Teams / Tournaments, in that order) are
+  identical on web and mobile; both query live Supabase.

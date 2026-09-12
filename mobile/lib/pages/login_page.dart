@@ -3,6 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'home_shell.dart';
 
+/// Roles available at public signup. Admin is NOT selectable — the single
+/// admin account is provisioned out-of-band (supabase/branding.sql).
+const kSignupRoles = <String>['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'];
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -14,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _name = TextEditingController();
+  String _role = 'Athlete';
   bool _busy = false;
   bool _obscure = true;
   bool _isSignUp = false;
@@ -35,9 +40,9 @@ class _LoginPageState extends State<LoginPage> {
         final response = await client.auth.signUp(
           email: _email.text.trim(),
           password: _password.text,
-          data: {'full_name': _name.text.trim(), 'role': 'Athlete'},
+          data: {'full_name': _name.text.trim(), 'role': _role},
         );
-        // mailer_autoconfirm = true → session is returned straight away
+        // mailer_autoconfirm = true -> session is returned straight away
         if (response.session == null) {
           if (!mounted) return;
           setState(() {
@@ -57,8 +62,7 @@ class _LoginPageState extends State<LoginPage> {
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error =
-          'Network error — is the phone online? (ClientException/SocketException usually means no INTERNET permission or no connection.)');
+      setState(() => _error = 'Network error. Check your connection and try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -66,7 +70,9 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -77,50 +83,84 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  RichText(
-                    text: const TextSpan(
-                      text: 'Sport',
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white),
-                      children: [
-                        TextSpan(text: 'Sphere',
-                            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF4F7CFF))),
-                      ],
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6A13),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.sports_score, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'SportSphere',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    _isSignUp ? 'Create your athlete account' : 'Coach & athlete companion',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    'Sports organization management platform',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13.5),
                   ),
                   const SizedBox(height: 28),
                   if (_isSignUp) ...[
                     TextField(
                       controller: _name,
+                      style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(labelText: 'Full name'),
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: _role,
+                      style: const TextStyle(color: Colors.white),
+                      dropdownColor: const Color(0xFF1A1A1A),
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        helperText: 'Determines what you can access after signing in.',
+                        helperStyle: TextStyle(color: Colors.white38, fontSize: 11.5),
+                      ),
+                      items: kSignupRoles
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _role = v ?? 'Athlete'),
                     ),
                     const SizedBox(height: 14),
                   ],
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                        labelText: 'Email', hintText: 'you@sportsphere.app'),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _password,
                     obscureText: _obscure,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       suffixIcon: IconButton(
-                        icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        icon: Icon(
+                          _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: Colors.white54,
+                        ),
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+                    Text(_error!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13)),
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
@@ -139,22 +179,18 @@ class _LoginPageState extends State<LoginPage> {
                               _isSignUp = !_isSignUp;
                               _error = null;
                             }),
-                    child: Text(_isSignUp
-                        ? 'Already have an account? Sign in'
-                        : "Don't have an account? Sign up"),
+                    child: Text(
+                      _isSignUp
+                          ? 'Already have an account? Sign in'
+                          : "Don't have an account? Sign up",
+                      style: const TextStyle(color: Color(0xFFFF8A42)),
+                    ),
                   ),
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E2740),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF2A3550)),
-                    ),
-                    child: const Text(
-                      'Demo: athlete@sportsphere.app or coach@sportsphere.app\nPassword: Passw0rd!',
-                      style: TextStyle(fontSize: 12, color: Colors.white60),
-                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Admin accounts are provisioned by the organization.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.white38, fontSize: 11.5),
                   ),
                 ],
               ),

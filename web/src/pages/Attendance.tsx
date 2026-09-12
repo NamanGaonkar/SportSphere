@@ -1,6 +1,18 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, statusColor, EmptyState } from '../components/ui'
+import { PageHead, Badge, statusColor, EmptyState, LoadingState, StatCard } from '../components/ui'
+import dataTableSx from '../components/tableSx'
 
 type AthleteRow = {
   id: string
@@ -17,9 +29,11 @@ export default function Attendance() {
   const [rows, setRows] = useState<AthleteRow[]>([])
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('athletes')
@@ -27,9 +41,9 @@ export default function Attendance() {
       .order('created_at')
     setRows((data as unknown as AthleteRow[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const statusFor = (r: AthleteRow) => {
     const rec = (r.profile?.attendance ?? []).find((a) => a.date === date)
@@ -43,6 +57,7 @@ export default function Attendance() {
       if (s) { total += 1; if (s === 'Present' || s === 'Late') present += 1 }
     }
     return { present, total, pct: total ? Math.round((present / total) * 100) : 0 }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, date])
 
   async function mark(r: AthleteRow, status: string) {
@@ -58,67 +73,95 @@ export default function Attendance() {
   }
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Attendance & Leave"
-        sub="Mark daily attendance for athletes; coaches and admins only."
+        sub="Mark daily attendance for athletes."
         action={
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextField
+            type="date"
+            size="small"
+            label="Date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
         }
       />
 
-      <div className="cards">
-        <div className="card stat-card">
-          <div className="stat-label">Marked</div>
-          <div className="stat-value">{summary.total}</div>
-          <div className="stat-sub">of {rows.length} athletes</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Present + Late</div>
-          <div className="stat-value">{summary.present}</div>
-          <div className="stat-sub">{summary.pct}% attendance</div>
-        </div>
-      </div>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <StatCard label="Marked" value={summary.total} sub={`of ${rows.length} athletes`} />
+        <StatCard label="Present + Late" value={summary.present} sub={`${summary.pct}% attendance`} />
+      </Box>
 
-      <div className="card">
+      <Paper>
         {loading ? (
-          <div className="muted">Loading…</div>
+          <LoadingState />
         ) : rows.length === 0 ? (
           <EmptyState text="No athletes to mark." />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Athlete</th><th>Status</th><th>Mark</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const s = statusFor(r)
-                return (
-                  <tr key={r.id}>
-                    <td>{r.profile?.full_name ?? '—'}</td>
-                    <td>{s ? <Badge color={statusColor(s)}>{s}</Badge> : <span className="muted">not marked</span>}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {STATUSES.map((st) => (
-                          <button
-                            key={st}
-                            disabled={saving}
-                            className={`btn small ${s === st ? '' : 'secondary'}`}
-                            onClick={() => mark(r, st)}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                      <div style={{ width: '100%' }} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Athlete</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Mark</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((r) => {
+                      const s = statusFor(r)
+                      return (
+                        <TableRow key={r.id} hover>
+                          <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
+                          <TableCell>
+                            {s ? <Badge color={statusColor(s)}>{s}</Badge> : <Box component="span" sx={{ color: 'text.secondary' }}>not marked</Box>}
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {STATUSES.map((st) => (
+                                <Button
+                                  key={st}
+                                  size="small"
+                                  disabled={saving}
+                                  variant={s === st ? 'contained' : 'outlined'}
+                                  onClick={() => mark(r, st)}
+                                  sx={{ minWidth: 72 }}
+                                >
+                                  {st}
+                                </Button>
+                              ))}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={rows.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
-    </div>
+      </Paper>
+    </Box>
   )
 }

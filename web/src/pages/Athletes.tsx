@@ -1,6 +1,30 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
+import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import InputAdornment from '@mui/material/InputAdornment'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, statusColor, EmptyState } from '../components/ui'
+import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
+import dataTableSx from '../components/tableSx'
 
 type Athlete = {
   id: string
@@ -19,6 +43,8 @@ export default function Athletes() {
   const [rows, setRows] = useState<Athlete[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [q, setQ] = useState('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [editProfileId, setEditProfileId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...empty })
@@ -26,7 +52,7 @@ export default function Athletes() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const [ath, tm] = await Promise.all([
       supabase.from('athletes').select('*, profile:profiles(id, full_name, contact_info), teams(name)').order('created_at'),
@@ -35,9 +61,9 @@ export default function Athletes() {
     setRows((ath.data as unknown as Athlete[]) ?? [])
     setTeams((tm.data as Team[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const filtered = useMemo(
     () => rows.filter((r) => (r.profile?.full_name ?? '').toLowerCase().includes(q.toLowerCase())),
@@ -65,7 +91,6 @@ export default function Athletes() {
         .eq('id', editing)
       if (error) { setError(error.message); return }
     } else {
-      // Roster-only profile (no login). Later, linking an auth user enables sign-in.
       const { data: profile, error: pErr } = await supabase
         .from('profiles')
         .insert({ full_name: form.full_name, role: 'Athlete', contact_info: null })
@@ -112,89 +137,117 @@ export default function Athletes() {
     dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 86400000)) : null
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Athletes"
-        sub="Roster management — profiles, sport, team and medical notes."
-        action={<button className="btn" onClick={() => { setEditing(null); setEditProfileId(null); setForm({ ...empty }); setShowForm(true) }}>+ Add Athlete</button>}
+        sub="Roster management - profiles, sport, team and medical notes."
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setEditProfileId(null); setForm({ ...empty }); setShowForm(true) }}>
+            Add Athlete
+          </Button>
+        }
       />
 
-      <div className="toolbar">
-        <input placeholder="Search by name…" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
+      <TextField
+        size="small"
+        placeholder="Search by name"
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setPage(0) }}
+        sx={{ mb: 2, width: 280 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
 
-      <div className="card">
+      <Paper>
         {loading ? (
-          <div className="muted">Loading…</div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
           <EmptyState text="No athletes found." />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Name</th><th>Sport</th><th>Team</th><th>Age</th><th>Medical</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.profile?.full_name ?? '—'}</td>
-                  <td>{r.sport ?? '—'}</td>
-                  <td>{r.teams?.name ?? '—'}</td>
-                  <td>{age(r.dob) ?? '—'}</td>
-                  <td>
-                    {r.medical_notes
-                      ? <Badge color={statusColor('Absent')}>⚠ {r.medical_notes.slice(0, 30)}</Badge>
-                      : <Badge color="green">OK</Badge>}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn secondary small" onClick={() => openEdit(r)}>Edit</button>{' '}
-                    <button className="btn danger small" onClick={() => remove(r.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Sport</TableCell>
+                    <TableCell>Team</TableCell>
+                    <TableCell>Age</TableCell>
+                    <TableCell>Medical</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((r) => (
+                      <TableRow key={r.id} hover>
+                        <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
+                        <TableCell>{r.sport ?? '-'}</TableCell>
+                        <TableCell>{r.teams?.name ?? '-'}</TableCell>
+                        <TableCell>{age(r.dob) ?? '-'}</TableCell>
+                        <TableCell>
+                          {r.medical_notes
+                            ? <Badge color="warning">{r.medical_notes.length > 28 ? r.medical_notes.slice(0, 28) + '...' : r.medical_notes}</Badge>
+                            : <Badge color="success">OK</Badge>}
+                        </TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => remove(r.id)} aria-label="Delete">
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
+      </Paper>
 
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit Athlete' : 'Add Athlete'}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                <div className="form-row">
-                  <label>Full name</label>
-                  <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
-                </div>
-                <div className="form-row">
-                  <label>Sport</label>
-                  <input value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} placeholder="Football" />
-                </div>
-                <div className="form-row">
-                  <label>Date of birth</label>
-                  <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>Team</label>
-                  <select value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })}>
-                    <option value="">— none —</option>
-                    {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <label>Medical notes</label>
-                <textarea value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} rows={2} />
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit Athlete' : 'Add Athlete'}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required fullWidth />
+              <TextField label="Sport" value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} fullWidth />
+              <TextField type="date" label="Date of birth" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField select label="Team" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </TextField>
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <TextField label="Medical notes" multiline minRows={2} value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} fullWidth />
+              </Box>
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

@@ -1,6 +1,28 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
+import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
-import { PageHead, Badge, statusColor, EmptyState } from '../components/ui'
+import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
+import dataTableSx from '../components/tableSx'
 
 type Match = {
   id: string
@@ -23,6 +45,8 @@ export default function Matches() {
   const [teams, setTeams] = useState<Team[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [filterT, setFilterT] = useState('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({
     tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', status: 'Scheduled',
@@ -31,7 +55,7 @@ export default function Matches() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const [m, t, tr] = await Promise.all([
       supabase
@@ -45,9 +69,9 @@ export default function Matches() {
     setTeams((t.data as Team[]) ?? [])
     setTournaments((tr.data as Tournament[]) ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const filtered = useMemo(
     () => (filterT ? rows.filter((r) => r.tournament_id === filterT) : rows),
@@ -113,121 +137,145 @@ export default function Matches() {
   }
 
   const fmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'
+    iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-'
 
   return (
-    <div>
+    <Box>
       <PageHead
         title="Fixtures & Results"
         sub="Schedule matches, update live scores, record results."
-        action={<button className="btn" onClick={() => openEdit()}>+ Add Match</button>}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openEdit()}>
+            Add Match
+          </Button>
+        }
       />
 
-      <div className="toolbar">
-        <select value={filterT} onChange={(e) => setFilterT(e.target.value)}>
-          <option value="">All tournaments</option>
-          {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-      </div>
+      <TextField
+        select
+        size="small"
+        value={filterT}
+        onChange={(e) => { setFilterT(e.target.value); setPage(0) }}
+        sx={{ mb: 2, width: 280 }}
+        label="Tournament"
+      >
+        <MenuItem value="">All tournaments</MenuItem>
+        {tournaments.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+      </TextField>
 
-      <div className="card">
+      <Paper>
         {loading ? (
-          <div className="muted">Loading…</div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
           <EmptyState text="No matches found." />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Match</th><th>Tournament</th><th>When</th><th>Score</th><th>Status</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</td>
-                  <td className="muted">{m.tournaments?.name ?? '—'}</td>
-                  <td className="muted">{fmt(m.scheduled_at)}</td>
-                  <td>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <input
-                        type="number" min={0} style={{ width: 56, padding: '4px 6px' }}
-                        defaultValue={m.score_a ?? 0}
-                        onBlur={(e) => Number(e.target.value) !== (m.score_a ?? 0) && updateScore(m, 'a', e.target.value)}
-                      />
-                      :
-                      <input
-                        type="number" min={0} style={{ width: 56, padding: '4px 6px' }}
-                        defaultValue={m.score_b ?? 0}
-                        onBlur={(e) => Number(e.target.value) !== (m.score_b ?? 0) && updateScore(m, 'b', e.target.value)}
-                      />
-                    </span>
-                  </td>
-                  <td>
-                    <select
-                      defaultValue={m.status}
-                      onChange={(e) => setStatus(m, e.target.value)}
-                      style={{ padding: '4px 8px', fontSize: 12 }}
-                    >
-                      {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <option key={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn secondary small" onClick={() => openEdit(m)}>Edit</button>{' '}
-                    <button className="btn danger small" onClick={() => remove(m.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <TableContainer sx={dataTableSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Match</TableCell>
+                    <TableCell>Tournament</TableCell>
+                    <TableCell>When</TableCell>
+                    <TableCell>Score</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((m) => (
+                      <TableRow key={m.id} hover>
+                        <TableCell>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{m.tournaments?.name ?? '-'}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{fmt(m.scheduled_at)}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            <TextField
+                              type="number" size="small" sx={{ width: 64 }}
+                              defaultValue={m.score_a ?? 0}
+                              onBlur={(e) => Number(e.target.value) !== (m.score_a ?? 0) && updateScore(m, 'a', e.target.value)}
+                            />
+                            <Box component="span">:</Box>
+                            <TextField
+                              type="number" size="small" sx={{ width: 64 }}
+                              defaultValue={m.score_b ?? 0}
+                              onBlur={(e) => Number(e.target.value) !== (m.score_b ?? 0) && updateScore(m, 'b', e.target.value)}
+                            />
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Badge color={statusColor(m.status)}>{m.status}</Badge>
+                            <TextField
+                              select size="small" defaultValue={m.status} sx={{ minWidth: 128 }}
+                              onChange={(e) => setStatus(m, e.target.value)}
+                            >
+                              {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                            </TextField>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton size="small" onClick={() => openEdit(m)} aria-label="Edit">
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => remove(m.id)} aria-label="Delete">
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </>
         )}
-      </div>
+      </Paper>
 
-      {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Edit Match' : 'Add Match'}</h2>
-            <form onSubmit={save}>
-              <div className="form-grid">
-                <div className="form-row">
-                  <label>Tournament</label>
-                  <select value={form.tournament_id} onChange={(e) => setForm({ ...form, tournament_id: e.target.value })}>
-                    <option value="">— none —</option>
-                    {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Team A</label>
-                  <select value={form.team_a_id} onChange={(e) => setForm({ ...form, team_a_id: e.target.value })}>
-                    <option value="">— none —</option>
-                    {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Team B</label>
-                  <select value={form.team_b_id} onChange={(e) => setForm({ ...form, team_b_id: e.target.value })}>
-                    <option value="">— none —</option>
-                    {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Scheduled at</label>
-                  <input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} />
-                </div>
-              </div>
-              {error && <div className="error-text">{error}</div>}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn">{editing ? 'Save' : 'Add'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={save}>
+          <DialogTitle>{editing ? 'Edit Match' : 'Add Match'}</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField select label="Tournament" value={form.tournament_id} onChange={(e) => setForm({ ...form, tournament_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {tournaments.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </TextField>
+              <TextField select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
+                {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              </TextField>
+              <TextField select label="Team A" value={form.team_a_id} onChange={(e) => setForm({ ...form, team_a_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </TextField>
+              <TextField select label="Team B" value={form.team_b_id} onChange={(e) => setForm({ ...form, team_b_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </TextField>
+              <TextField
+                type="datetime-local" label="Scheduled at" value={form.scheduled_at}
+                onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+                slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ gridColumn: '1 / -1' }}
+              />
+            </Box>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   )
 }

@@ -42,6 +42,8 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
+/// Home dashboard — same metrics, same order as the web admin dashboard:
+/// Athletes, Coaches, Teams, Tournaments (then recent match).
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -52,9 +54,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String _name = '';
   String _role = '';
-  String _team = '';
-  String _sport = '';
   bool _loading = true;
+  int _athletes = 0;
+  int _coaches = 0;
+  int _teams = 0;
+  int _tournaments = 0;
+  Map<String, dynamic>? _nextMatch;
 
   @override
   void initState() {
@@ -67,24 +72,32 @@ class _HomePageState extends State<HomePage> {
     final uid = client.auth.currentUser?.id;
     if (uid == null) return;
 
-    final profile = await client.from('profiles').select('full_name, role').eq('id', uid).maybeSingle();
-    String team = '';
-    String sport = '';
-    final athlete = await client
-        .from('athletes')
-        .select('sport, teams(name)')
-        .eq('profile_id', uid)
-        .maybeSingle();
-    if (athlete != null) {
-      sport = (athlete['sport'] ?? '').toString();
-      team = (((athlete['teams'] ?? {}) as Map)['name'] ?? '').toString();
-    }
+    final results = await Future.wait<dynamic>([
+      client.from('profiles').select('full_name, role').eq('id', uid).maybeSingle(),
+      client.from('athletes').select('id'),
+      client.from('coaches').select('id'),
+      client.from('teams').select('id'),
+      client.from('tournaments').select('id'),
+      client
+          .from('matches')
+          .select(
+              '*, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
+          .inFilter('status', ['Scheduled', 'Live'])
+          .order('scheduled_at')
+          .limit(1)
+          .maybeSingle(),
+    ]);
+
     if (!mounted) return;
+    final profile = results[0] as Map<String, dynamic>?;
     setState(() {
-      _name = (profile?['full_name'] ?? 'Athlete').toString();
+      _name = (profile?['full_name'] ?? '').toString();
       _role = (profile?['role'] ?? '').toString();
-      _team = team;
-      _sport = sport;
+      _athletes = (results[1] as List).length;
+      _coaches = (results[2] as List).length;
+      _teams = (results[3] as List).length;
+      _tournaments = (results[4] as List).length;
+      _nextMatch = results[5] as Map<String, dynamic>?;
       _loading = false;
     });
   }
@@ -92,7 +105,16 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SportSphere')),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {},
+            tooltip: 'Alerts',
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -100,89 +122,99 @@ class _HomePageState extends State<HomePage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text('Hi, $_name 👋',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text(_role.isEmpty ? 'Welcome back' : '$_role${_team.isNotEmpty ? ' • $_team' : ''}${_sport.isNotEmpty ? ' • $_sport' : ''}',
-                      style: const TextStyle(color: Colors.white60)),
-                  const SizedBox(height: 20),
-                  _NextMatchCard(),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(child: _quickStat(context, Icons.fact_check, 'Attendance', 'Mark today', 0)),
-                      const SizedBox(width: 12),
-                      Expanded(child: _quickStat(context, Icons.emoji_events_outlined, 'Awards', 'Your achievements', 3)),
-                    ],
+                  Text(
+                    _name.isEmpty ? 'Welcome' : _name,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
                   ),
+                  if (_role.isNotEmpty)
+                    Text(_role, style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  // Stat cards: equal height, equal 16px gaps — mirrors web dashboard order.
+                  LayoutBuilder(builder: (context, constraints) {
+                    final cols = constraints.maxWidth >= 560 ? 4 : 2;
+                    const gap = 16.0;
+                    final itemWidth = (constraints.maxWidth - gap * (cols - 1)) / cols;
+                    final items = [
+                      _StatCard(label: 'ATHLETES', value: '$_athletes', sub: 'Active roster'),
+                      _StatCard(label: 'COACHES', value: '$_coaches', sub: 'Across all sports'),
+                      _StatCard(label: 'TEAMS', value: '$_teams', sub: 'Registered squads'),
+                      _StatCard(label: 'TOURNAMENTS', value: '$_tournaments', sub: 'All levels'),
+                    ];
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (final item in items)
+                          SizedBox(
+                            width: itemWidth,
+                            child: item,
+                          ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  _NextMatchCard(match: _nextMatch),
                 ],
               ),
             ),
     );
   }
+}
 
-  Widget _quickStat(BuildContext context, IconData icon, String title, String sub, int tabIndex) {
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  const _StatCard({required this.label, required this.value, required this.sub});
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: const Color(0xFF4F7CFF)),
-              const SizedBox(height: 10),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(sub, style: const TextStyle(fontSize: 12, color: Colors.white54)),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(value, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(sub, style: const TextStyle(fontSize: 12, color: Colors.black45)),
+          ],
         ),
       ),
     );
   }
 }
 
-class _NextMatchCard extends StatefulWidget {
-  @override
-  State<_NextMatchCard> createState() => _NextMatchCardState();
-}
-
-class _NextMatchCardState extends State<_NextMatchCard> {
-  Map<String, dynamic>? _match;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final client = Supabase.instance.client;
-    final data = await client
-        .from('matches')
-        .select('*, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
-        .inFilter('status', ['Scheduled', 'Live'])
-        .order('scheduled_at', ascending: true)
-        .limit(1)
-        .maybeSingle();
-    if (!mounted) return;
-    setState(() => _match = data);
-  }
+class _NextMatchCard extends StatelessWidget {
+  final Map<String, dynamic>? match;
+  const _NextMatchCard({required this.match});
 
   @override
   Widget build(BuildContext context) {
-    final m = _match;
+    final m = match;
     if (m == null) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text('No upcoming matches scheduled.', style: TextStyle(color: Colors.white54)),
+          child: Text('No upcoming matches scheduled.',
+              style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
         ),
       );
     }
     final when = m['scheduled_at']?.toString();
     final dt = when != null ? DateTime.tryParse(when)?.toLocal() : null;
+    final status = (m['status'] ?? '').toString();
+    final live = status == 'Live';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -194,17 +226,21 @@ class _NextMatchCardState extends State<_NextMatchCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: m['status'] == 'Live' ? const Color(0xFFEF4444) : const Color(0xFF4F7CFF),
+                    color: live ? const Color(0xFFC62828) : const Color(0xFF1565C0),
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text((m['status'] ?? '').toString(),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  child: Text(
+                    status,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(((((m['tournaments'] ?? {}) as Map)['name']) ?? '').toString(),
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                  child: Text(
+                    ((((m['tournaments'] ?? {}) as Map)['name']) ?? '').toString(),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.45)),
+                  ),
                 ),
               ],
             ),
@@ -218,7 +254,7 @@ class _NextMatchCardState extends State<_NextMatchCard> {
               dt != null
                   ? '${dt.day}/${dt.month} at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
                   : 'Time TBD',
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
+              style: TextStyle(color: Colors.black.withValues(alpha: 0.5), fontSize: 13),
             ),
           ],
         ),

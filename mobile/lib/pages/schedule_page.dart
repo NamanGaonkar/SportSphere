@@ -75,7 +75,20 @@ class _SchedulePageState extends State<SchedulePage> {
 
   String _fmt(DateTime? dt) {
     if (dt == null) return 'Time TBD';
-    return '${dt.day}/${dt.month} · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return "${dt.day}/${dt.month} - ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Live':
+        return const Color(0xFFC62828);
+      case 'Completed':
+        return const Color(0xFF2E7D32);
+      case 'Scheduled':
+        return const Color(0xFF1565C0);
+      default:
+        return Colors.black45;
+    }
   }
 
   @override
@@ -90,15 +103,23 @@ class _SchedulePageState extends State<SchedulePage> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   const Text('Upcoming & Live', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   if (_upcoming.isEmpty)
-                    const Text('No upcoming matches.', style: TextStyle(color: Colors.white54)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text('No upcoming matches.',
+                          style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                    ),
                   ..._upcoming.map(_matchCard),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   const Text('Recent Results', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   if (_results.isEmpty)
-                    const Text('No results yet.', style: TextStyle(color: Colors.white54)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text('No results yet.',
+                          style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                    ),
                   ..._results.take(10).map(_matchCard),
                 ],
               ),
@@ -107,11 +128,10 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Widget _matchCard(MatchItem m) {
-    final live = m.status == 'Live';
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -120,30 +140,27 @@ class _SchedulePageState extends State<SchedulePage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
-                    color: live
-                        ? const Color(0xFFEF4444)
-                        : m.status == 'Completed'
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFF4F7CFF),
+                    color: _statusColor(m.status),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(m.status,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(m.tournament,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                      style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.45))),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(child: Text(m.teamA, style: const TextStyle(fontWeight: FontWeight.w600))),
                 Text('${m.scoreA} : ${m.scoreB}',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF4F7CFF))),
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFFFF6A13))),
                 Expanded(
                   child: Text(m.teamB,
                       textAlign: TextAlign.right,
@@ -152,7 +169,7 @@ class _SchedulePageState extends State<SchedulePage> {
               ],
             ),
             const SizedBox(height: 6),
-            Text(_fmt(m.when), style: const TextStyle(fontSize: 12, color: Colors.white54)),
+            Text(_fmt(m.when), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.5))),
           ],
         ),
       ),
