@@ -1,0 +1,358 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../data/sports.dart';
+import '../main.dart' show Brand;
+import '../widgets/common.dart';
+import 'crud_page.dart' show DbRow;
+
+final client = Supabase.instance.client;
+
+class MatchesAdminPage extends StatefulWidget {
+  const MatchesAdminPage({super.key});
+
+  @override
+  State<MatchesAdminPage> createState() => _MatchesAdminPageState();
+}
+
+class _MatchesAdminPageState extends State<MatchesAdminPage> {
+  List<DbRow> _rows = [];
+  List<DbRow> _teams = [];
+  List<DbRow> _tournaments = [];
+  bool _loading = true;
+  String _tournamentFilter = '';
+  String? _sportFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait<dynamic>([
+        client
+            .from('matches')
+            .select(
+                '*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name)')
+            .order('scheduled_at', ascending: false),
+        client.from('teams').select('id, name').order('name'),
+        client.from('tournaments').select('id, name').order('name'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _rows = (results[0] as List).cast<DbRow>();
+        _teams = (results[1] as List).cast<DbRow>();
+        _tournaments = (results[2] as List).cast<DbRow>();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      showSnack(context, 'Load failed: $e', error: true);
+    }
+  }
+
+  List<DbRow> get _filtered => _rows.where((r) {
+        final tOk = _tournamentFilter.isEmpty || '${r['tournament_id'] ?? ''}' == _tournamentFilter;
+        final sOk = _sportFilter == null ||
+            '${((r['team_a'] ?? {}) as Map)['sport_id'] ?? ''}' == _sportFilter;
+        return tOk && sOk;
+      }).toList();
+
+  Future<void> _updateScore(DbRow m, String side, String value) async {
+    final v = int.tryParse(value) ?? 0;
+    await client.from('matches').update({side == 'a' ? 'score_a' : 'score_b': v}).eq('id', m['id']);
+    _load();
+  }
+
+  Future<void> _setStatus(DbRow m, String status) async {
+    final payload = <String, dynamic>{'status': status};
+    if (status == 'Completed') {
+      payload['result'] =
+          '${((m['team_a'] ?? {}) as Map)['name'] ?? 'A'} ${m['score_a'] ?? 0} - ${m['score_b'] ?? 0} ${((m['team_b'] ?? {}) as Map)['name'] ?? 'B'}';
+    }
+    await client.from('matches').update(payload).eq('id', m['id']);
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sports = SportsCache.instance.rows;
+    final filtered = _filtered;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          PageHead('Fixtures & Results',
+              sub: 'Schedule matches, update live scores, record results.',
+              action: FilledButton.icon(
+                onPressed: () => _showForm(null),
+                icon: const Icon(Icons.add, size: 20),
+                label: const Text('Add Match'),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              )),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _tournamentFilter,
+                  hint: const Text('All tournaments', style: TextStyle(fontSize: 13)),
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('All tournaments', style: TextStyle(fontSize: 13))),
+                    for (final t in _tournaments)
+                      DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}', style: const TextStyle(fontSize: 13))),
+                  ],
+                  onChanged: (v) => setState(() => _tournamentFilter = v ?? ''),
+                ),
+              ),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _sportFilter,
+                  hint: const Text('All sports', style: TextStyle(fontSize: 13)),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All sports', style: TextStyle(fontSize: 13))),
+                    for (final s in sports)
+                      DropdownMenuItem(value: '${s['id']}', child: Text('${s['name']}', style: const TextStyle(fontSize: 13))),
+                  ],
+                  onChanged: (v) => setState(() => _sportFilter = v),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: _loading
+                ? const LoadingState()
+                : filtered.isEmpty
+                    ? const EmptyState('No matches found.')
+                    : Column(
+                        children: [
+                          for (final m in filtered) _matchTile(m),
+                        ],
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _matchTile(DbRow m) {
+    final sports = SportsCache.instance;
+    final status = '${m['status'] ?? 'Scheduled'}';
+    final when = DateTime.tryParse('${m['scheduled_at'] ?? ''}')?.toLocal();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  '${((m['team_a'] ?? {}) as Map)['name'] ?? 'TBD'} vs ${((m['team_b'] ?? {}) as Map)['name'] ?? 'TBD'}',
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+              BadgeChip(status, color: statusColor(status)),
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, size: 20),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit match')),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete match')),
+                ],
+                onSelected: (v) async {
+                  if (v == 'edit') _showForm(m);
+                  if (v == 'delete') {
+                    if (!await confirmDelete(context, 'match')) return;
+                    await client.from('matches').delete().eq('id', m['id']);
+                    _load();
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${sports.name(((m['team_a'] ?? {}) as Map)['sport_id']?.toString())} - '
+            '${((m['tournaments'] ?? {}) as Map)['name'] ?? '-'} - '
+            '${when == null ? '-' : fmtDateTime(when.toIso8601String())}',
+            style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _scoreBox(m, 'a', '${m['score_a'] ?? 0}'),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Text(':', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              _scoreBox(m, 'b', '${m['score_b'] ?? 0}'),
+              const Spacer(),
+              SizedBox(
+                width: 132,
+                child: DropdownButtonFormField<String>(
+                  initialValue: status,
+                  isDense: true,
+                  decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  items: [
+                    for (final s in ['Scheduled', 'Live', 'Completed', 'Cancelled'])
+                      DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 13))),
+                  ],
+                  onChanged: (v) => v != null && v != status ? _setStatus(m, v) : null,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _scoreBox(DbRow m, String side, String initial) {
+    return SizedBox(
+      width: 56,
+      child: TextFormField(
+        initialValue: initial,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Brand.primary),
+        decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+        onFieldSubmitted: (v) => _updateScore(m, side, v),
+      ),
+    );
+  }
+
+  Future<void> _showForm(DbRow? editing) async {
+    String tournamentId = '${editing?['tournament_id'] ?? ''}';
+    String teamAId = '${((editing?['team_a'] ?? {}) as Map)['id'] ?? ''}';
+    String teamBId = '${((editing?['team_b'] ?? {}) as Map)['id'] ?? ''}';
+    String status = editing != null ? '${editing['status']}' : 'Scheduled';
+    String? scheduledAt = editing?['scheduled_at']?.toString();
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.9,
+          maxChildSize: 0.95,
+          builder: (ctx, scrollCtrl) => StatefulBuilder(
+            builder: (ctx, setM) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(editing == null ? 'Add Match' : 'Edit Match',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: tournamentId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Tournament'),
+                        items: [
+                          const DropdownMenuItem(value: '', child: Text('None')),
+                          for (final t in _tournaments)
+                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                        ],
+                        onChanged: (v) => setM(() => tournamentId = v ?? ''),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: status,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Status'),
+                        items: [
+                          for (final s in ['Scheduled', 'Live', 'Completed', 'Cancelled'])
+                            DropdownMenuItem(value: s, child: Text(s)),
+                        ],
+                        onChanged: (v) => setM(() => status = v ?? 'Scheduled'),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: teamAId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Team A'),
+                        items: [
+                          const DropdownMenuItem(value: '', child: Text('None')),
+                          for (final t in _teams)
+                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                        ],
+                        onChanged: (v) => setM(() => teamAId = v ?? ''),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: teamBId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Team B'),
+                        items: [
+                          const DropdownMenuItem(value: '', child: Text('None')),
+                          for (final t in _teams)
+                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                        ],
+                        onChanged: (v) => setM(() => teamBId = v ?? ''),
+                      ),
+                      const SizedBox(height: 14),
+                      DateTimeField(
+                        label: 'Scheduled at',
+                        value: scheduledAt,
+                        onChanged: (v) => setM(() => scheduledAt = v),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + MediaQuery.of(ctx).padding.bottom),
+                  child: Row(children: [
+                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: Text(editing == null ? 'Add' : 'Save'))),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final payload = {
+        'tournament_id': tournamentId.isEmpty ? null : tournamentId,
+        'team_a_id': teamAId.isEmpty ? null : teamAId,
+        'team_b_id': teamBId.isEmpty ? null : teamBId,
+        'scheduled_at': scheduledAt,
+        'status': status,
+      };
+      if (editing != null) {
+        await client.from('matches').update(payload).eq('id', editing['id']);
+      } else {
+        await client.from('matches').insert(payload);
+      }
+      _load();
+    } catch (e) {
+      if (mounted) showSnack(context, 'Save failed: $e', error: true);
+    }
+  }
+}

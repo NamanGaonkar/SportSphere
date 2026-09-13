@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'login_page.dart';
 
 /// First-launch experience: full-bleed feature image at ~50% opacity behind
-/// bold aggressive lettering, one image per slide, auto-rotating.
+/// bold aggressive lettering. Users can swipe between slides by hand; it also
+/// auto-rotates (pausing briefly after a manual swipe).
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
 
@@ -12,9 +15,6 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
-  int _page = 0;
-  bool _advancing = true;
-
   static const _slides = <(String, String, String)>[
     ('assets/images/feature1.png', 'EVERY GAME. ONE PLATFORM.',
         'Athletes, coaches, teams, tournaments, venues and operations - managed end to end.'),
@@ -24,26 +24,53 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'Live scores, alerts and schedules the moment they happen.'),
   ];
 
+  final _controller = PageController();
+  Timer? _timer;
+  bool _hold = false; // suppress auto-advance briefly after manual swipe
+
+  int get _page => _controller.hasClients
+      ? _controller.page?.round() ?? 0
+      : 0;
+
   @override
   void initState() {
     super.initState();
-    _autoAdvance();
+    _startAutoAdvance();
   }
 
-  @override
-  void dispose() {
-    _advancing = false;
-    super.dispose();
+  void _startAutoAdvance() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _hold) return;
+      final current = _controller.hasClients ? (_controller.page ?? 0) : 0;
+      final next = current >= _slides.length - 1 ? 0 : current + 1;
+      _controller.animateToPage(
+        next.toInt(),
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
-  Future<void> _autoAdvance() async {
-    await Future<void>.delayed(const Duration(seconds: 4));
-    if (!mounted || !_advancing) return;
-    setState(() => _page = _page < _slides.length - 1 ? _page + 1 : 0);
-    _autoAdvance();
+  void _onUserPageChanged(int page) {
+    setState(() {}); // refresh dots/headline
+    // Pause auto-rotation for one cycle after the user interacts.
+    _hold = true;
+    Timer(const Duration(seconds: 7), () {
+      if (mounted) _hold = false;
+    });
+  }
+
+  void _goTo(int page) {
+    _controller.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _go(bool signup) {
+    _timer?.cancel();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => signup ? const LoginPage(initialSignUp: true) : const LoginPage(),
@@ -51,31 +78,35 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  /// Animated cross-fade between the three feature images. ONLY the image
-  /// swaps — the text, dots and buttons are fixed UI and never slide.
-  Widget _imageStack() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        for (var i = 0; i < _slides.length; i++)
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 450),
-            opacity: _page == i ? 0.5 : 0.0,
-            child: Image.asset(_slides[i].$1, fit: BoxFit.cover),
-          ),
-      ],
-    );
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final page = _page.clamp(0, _slides.length - 1);
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          _imageStack(),
-          // Dark gradient veil so the lettering stays readable
+          // Swipeable full-bleed feature image, one per slide.
+          PageView.builder(
+            controller: _controller,
+            itemCount: _slides.length,
+            onPageChanged: _onUserPageChanged,
+            itemBuilder: (context, i) {
+              return Image.asset(
+                _slides[i].$1,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              );
+            },
+          ),
+          // Dark gradient veil so the lettering stays readable over the image.
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -94,14 +125,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
             child: Column(
               children: [
                 const Spacer(flex: 3),
-                Padding(
+                // IgnorePointer: the headline sits over the PageView; without
+                // this the text swallows horizontal drags and swipes "do nothing".
+                IgnorePointer(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Column(
                     children: [
                       Text(
-                        _slides[_page].$2,
+                        _slides[page].$2,
                         textAlign: TextAlign.center,
-                        key: ValueKey(_page),
+                        key: ValueKey('title$page'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 30,
@@ -113,9 +147,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        _slides[_page].$3,
+                        _slides[page].$3,
                         textAlign: TextAlign.center,
-                        key: ValueKey('body$_page'),
+                        key: ValueKey('body$page'),
                         style: const TextStyle(
                           color: Color(0xE6FFFFFF),
                           fontSize: 15.5,
@@ -126,19 +160,28 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ],
                   ),
                 ),
+                ),
                 const Spacer(flex: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     for (var j = 0; j < _slides.length; j++)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: j == _page ? 26 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: j == _page ? const Color(0xFFFF5500) : Colors.white30,
-                          borderRadius: BorderRadius.circular(999),
+                      GestureDetector(
+                        onTap: () => _goTo(j),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            width: j == page ? 26 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: j == page
+                                  ? const Color(0xFFFF5500)
+                                  : Colors.white30,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
                         ),
                       ),
                   ],

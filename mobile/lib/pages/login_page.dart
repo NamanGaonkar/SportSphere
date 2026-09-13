@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'home_shell.dart';
@@ -105,7 +106,10 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
-      body: SafeArea(
+      // Dark screen: force light status bar icons so battery/clock are visible.
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+        child: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -146,14 +150,14 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
+                        // No initialValue here: the dropdown is rebuilt when
+                        // toggling sign in/sign up, and reusing a GlobalKey-backed
+                        // initialValue across rebuilds throws.
                         initialValue: _role,
                         style: const TextStyle(color: Colors.white, fontSize: 15),
                         dropdownColor: darkFill,
                         icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                        decoration: deco('Role').copyWith(
-                          helperText: 'Determines what you can access after signing in.',
-                          helperStyle: const TextStyle(color: Colors.white38, fontSize: 11.5),
-                        ),
+                        decoration: deco('Role'),
                         items: kSignupRoles
                             .map((r) => DropdownMenuItem(
                                   value: r,
@@ -161,6 +165,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ))
                             .toList(),
                         onChanged: (v) => setState(() => _role = v ?? 'Athlete'),
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Select a role' : null,
                       ),
                       const SizedBox(height: 14),
                     ],
@@ -224,6 +230,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

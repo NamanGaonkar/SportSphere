@@ -49,3 +49,44 @@ New admin-only Sports page (sidebar → Sports) to add/edit/delete sports. Sport
 Sport filter chips + sport badges on Schedule, Teams-by-Sport card on Home, leave-reason dialog on Attendance, all pulling the same live sports list and realtime updates.
 
 Web typecheck ✅ ·  flutter analyze  clean ✅ · APK 21.3MB installed ✅ · Logins unchanged ( Test@1234 ).
+
+
+
+also u knoe idk the notifcation panel on the top of the app goes dRK LIEK ON PHONES LIK EU KNOW WHERE THE PHOENS SHOES BATTERY AND STUFF LIKETHOSE ON PHONRI CANT SEE THOSE ALSO THE ROLE DROP DOWN IN SIGN UP PAGE FOR PHONE U KNOW IT SHOUDL BE AS TEH AME FIELD SIDE AS THR OLE ITS COMINGOUT LOOKS UGLY MAKE TIT THE SAM EWAY HOW IT DOES INT HT WEB ;OLE ALS IN ATTENDANCE THE LEAVE FILLTER ASKS BE A REASSON FOR SOME REASSON ITS VCOMPETY BROKEN LIKE DUHHH WHAT TF ?  PROFILE SECTION KEEPS LAODING AND NOT EVEYHTING FROM THE WEBAPP IS BEEN IMPORTED ON HERE LIKE AND THAT SWIPE BUT STILLD ORSNT WORK THE PROGFILE ICON KEEPS LOADING ON THE APP NO FILED IND ETAILIS AVIALABLE I LOGGED IN AS ADMINA ND I STILL CANT SEEE 20% OF STUFF THAT ADMIN HAS ONW EB APP I NEED THE ENITRE CU TCOPY PASTE FUCTIONALIYU OF WEB APP HERE IDK HOW U IMPLEMENT IT BUTI WANT IT ASAP KEEP EVEYTHING SAME INW EBAPP AND REPLICATE EXACTS AME HTING IN PHONE IF U WANT TO SHO W SIDE BAR SHWO A COOLAPSE ONE ON PHONE AND OINCLUE ALL LOGIC AN SAME DATA SYNC BETWEEN WBAPP AND APP SO DDISSPOINTED IN APP FR
+
+
+
+Done — the app is now a true copy of the web app. Here's everything:
+
+Fixed
+
+Status bar invisible on dark screens — the app now draws edge-to-edge and each dark screen (splash, onboarding, login) explicitly sets light status-bar icons, so battery/clock/WiFi are always visible.
+
+Sign-up role dropdown — sized exactly like the text fields now, dark background, white text, menu opens properly below the field (same look as web).
+
+Attendance leave = broken — you were right, it was nonsense. Now tapping Leave opens a reason dialog that requires a reason before saving (same as web), Present/Absent/Late mark instantly, and each row shows the current status badge with the reason on long-press.
+
+Profile infinite loading — rewritten from scratch: live profile query, initials avatar, role badge, account info, athlete record (team/sports/DOB/medical) or coaching record, plus your awards — all from Supabase with proper error + retry states.
+
+Swipe still "not working" — real root cause found: the headline text sat on top of the PageView and swallowed every horizontal drag. It's wrapped in  IgnorePointer  now, so finger swipes actually reach the pager. (Also verified via injected gestures on device.)
+
+Full web-app parity on the phone
+
+The old 5-tab bottom bar is gone. The phone now has the same collapsible sidebar drawer as the web app — hamburger toggles between icon-only and full labels, with the identical sections/order:
+- Overview — Dashboard (same 4 stat cards, Recent Matches, Teams by Sport bars, 7-day attendance chart, plus payroll/awards cards) · Reports (same datasets: athletes by sport, teams by sport, 30-day attendance, awards)
+- People — Athletes (multi-sport chips), Coaches, Teams (roster counts), Staff & HR (payroll)
+- Competitions — Tournaments (level badges, filters), Fixtures & Results with inline live score editing + status dropdown, Venues (cards with bookings)
+- Operations — Attendance & Leave, Inventory (low-stock panel), Housekeeping, Vendors & Purchases, Finance & Expenses
+- Programs — Training & Camps, School Activities, Events, Transport, Accommodation
+- Athlete Care — Performance, Medical
+
+Every page has web-style tables with pagination (10/25/50 rows per page), search, add/edit/delete dialogs, and date/datetime pickers. Role gating matches web exactly (Staff & HR hidden for non-HR/Admin, Finance for Admin/Finance/HR, etc.).
+
+Same data, same moment: every page subscribes to Supabase realtime — change something on the web and the phone updates instantly, and vice-versa. Nothing cached, nothing mock.
+
+Verified
+
+-  flutter analyze : 0 issues · web  tsc : clean
+- New 22.6MB APK installed on your phone — launches, runs, zero  FATAL EXCEPTION s
+
+Sign in as  admin@sportsphere.app  on the phone and you'll see everything the web admin sees.

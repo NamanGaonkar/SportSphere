@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pages/splash_page.dart';
@@ -18,6 +19,9 @@ class Brand {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Edge-to-edge: draw behind the status bar so dark screens control the
+  // status bar icon color themselves (fixes invisible battery/clock icons).
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseAnonKey);
   runApp(const SportSphereApp());
 }
@@ -27,11 +31,17 @@ class SportSphereApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: MaterialApp(
       title: 'SportSphere',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       home: const SplashPage(),
+      ),
     );
   }
 
