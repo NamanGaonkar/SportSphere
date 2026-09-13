@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../data/sports.dart';
+
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
 
@@ -14,6 +16,7 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _saving = false;
   List<Map<String, dynamic>> _myDays = [];
   String? _todayStatus;
+  RealtimeChannel? _channel;
 
   static const _statuses = ['Present', 'Late', 'Leave', 'Absent'];
 
@@ -34,7 +37,16 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void initState() {
     super.initState();
+    _channel = listen('attendance', () { _load(); });
     _load();
+  }
+
+  @override
+  void dispose() {
+    if (_channel != null) {
+      Supabase.instance.client.removeChannel(_channel!);
+    }
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -65,7 +77,7 @@ class _AttendancePageState extends State<AttendancePage> {
     });
   }
 
-  Future<void> _mark(String status) async {
+  Future<void> _mark(String status, {String? leaveReason}) async {
     setState(() => _saving = true);
     final client = Supabase.instance.client;
     final uid = client.auth.currentUser!.id;
@@ -78,13 +90,18 @@ class _AttendancePageState extends State<AttendancePage> {
         .cast<Map<String, dynamic>?>()
         .firstOrNull;
 
+    final payload = <String, dynamic>{
+      'status': status,
+      if (status == 'Leave') 'leave_reason': leaveReason,
+    };
+
     try {
       if (existing != null) {
-        await client.from('attendance').update({'status': status}).eq('id', existing['id']);
+        await client.from('attendance').update(payload).eq('id', existing['id']);
       } else {
         await client
             .from('attendance')
-            .insert({'profile_id': uid, 'date': todayKey, 'status': status});
+            .insert({'profile_id': uid, 'date': todayKey, ...payload});
       }
     } catch (e) {
       if (mounted) {
@@ -95,6 +112,29 @@ class _AttendancePageState extends State<AttendancePage> {
     }
     await _load();
     if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _askLeaveReason() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave reason'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Reason'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Mark Leave'),
+          ),
+        ],
+      ),
+    );
+    if (reason != null) await _mark('Leave', leaveReason: reason.isEmpty ? null : reason);
   }
 
   @override
@@ -119,7 +159,15 @@ class _AttendancePageState extends State<AttendancePage> {
                       return ChoiceChip(
                         label: Text(s),
                         selected: selected,
-                        onSelected: _saving ? null : (_) => _mark(s),
+                        onSelected: _saving
+                            ? null
+                            : (_) async {
+                                if (s == 'Leave') {
+                                  await _askLeaveReason();
+                                } else {
+                                  await _mark(s);
+                                }
+                              },
                         selectedColor: _color(s),
                         checkmarkColor: Colors.white,
                         labelStyle: TextStyle(

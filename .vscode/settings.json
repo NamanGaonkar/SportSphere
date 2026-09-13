@@ -1,0 +1,8 @@
+{
+  "terminal.integrated.env.windows": {
+    "SUPABASE_URL": "",
+    "SUPABASE_ANON_KEY": ""
+  },
+  "dart.flutterCustomEmulators": [],
+  "explorer.excludeGitIgnore": true
+}

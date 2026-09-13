@@ -21,6 +21,8 @@ import AddIcon from '@mui/icons-material/Add'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
+import { useRealtimeTable, useSports } from '../lib/hooks'
+import { SportFilter } from '../components/SportSelect'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
@@ -32,7 +34,7 @@ type Match = {
   result: string | null
   scheduled_at: string | null
   tournament_id: string | null
-  team_a: { id: string; name: string } | null
+  team_a: { id: string; name: string; sport_id: string | null } | null
   team_b: { id: string; name: string } | null
   tournaments: { name: string } | null
 }
@@ -45,6 +47,8 @@ export default function Matches() {
   const [teams, setTeams] = useState<Team[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [filterT, setFilterT] = useState('')
+  const [filterS, setFilterS] = useState('')
+  const { byId } = useSports()
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
@@ -60,7 +64,7 @@ export default function Matches() {
     const [m, t, tr] = await Promise.all([
       supabase
         .from('matches')
-        .select('*, team_a:teams!matches_team_a_id_fkey(id, name), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name)')
+        .select('*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name)')
         .order('scheduled_at', { ascending: false }),
       supabase.from('teams').select('id, name').order('name'),
       supabase.from('tournaments').select('id, name').order('name'),
@@ -72,10 +76,16 @@ export default function Matches() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useRealtimeTable('matches', load)
 
   const filtered = useMemo(
-    () => (filterT ? rows.filter((r) => r.tournament_id === filterT) : rows),
-    [rows, filterT],
+    () =>
+      rows.filter(
+        (r) =>
+          (!filterT || r.tournament_id === filterT) &&
+          (!filterS || r.team_a?.sport_id === filterS),
+      ),
+    [rows, filterT, filterS],
   )
 
   async function save(e: React.FormEvent) {
@@ -151,17 +161,20 @@ export default function Matches() {
         }
       />
 
-      <TextField
-        select
-        size="small"
-        value={filterT}
-        onChange={(e) => { setFilterT(e.target.value); setPage(0) }}
-        sx={{ mb: 2, width: 280 }}
-        label="Tournament"
-      >
-        <MenuItem value="">All tournaments</MenuItem>
-        {tournaments.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-      </TextField>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <TextField
+          select
+          size="small"
+          value={filterT}
+          onChange={(e) => { setFilterT(e.target.value); setPage(0) }}
+          sx={{ width: 280 }}
+          label="Tournament"
+        >
+          <MenuItem value="">All tournaments</MenuItem>
+          {tournaments.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+        </TextField>
+        <SportFilter value={filterS} onChange={(v) => { setFilterS(v); setPage(0) }} />
+      </Box>
 
       <Paper>
         {loading ? (
@@ -175,6 +188,7 @@ export default function Matches() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Match</TableCell>
+                    <TableCell>Sport</TableCell>
                     <TableCell>Tournament</TableCell>
                     <TableCell>When</TableCell>
                     <TableCell>Score</TableCell>
@@ -188,6 +202,7 @@ export default function Matches() {
                     .map((m) => (
                       <TableRow key={m.id} hover>
                         <TableCell>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</TableCell>
+                        <TableCell>{byId(m.team_a?.sport_id) || '-'}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{m.tournaments?.name ?? '-'}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{fmt(m.scheduled_at)}</TableCell>
                         <TableCell>

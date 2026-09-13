@@ -1,7 +1,9 @@
 import CrudPage from '../components/CrudPage'
 import type { ColumnDef, FieldDef } from '../components/CrudPage'
 import { Badge, statusColor } from '../components/ui'
+import { useSportNameMap } from '../components/SportSelect'
 
+const sportSource = { table: 'sports', select: 'id, name', labelPath: 'name' }
 const vendorSource = { table: 'vendors', select: 'id, name', labelPath: 'name' }
 const teamSource = { table: 'teams', select: 'id, name', labelPath: 'name' }
 const venueSource = { table: 'venues', select: 'id, name', labelPath: 'name' }
@@ -58,10 +60,11 @@ export function Housekeeping() {
 }
 
 export function Training() {
+  const sportName = useSportNameMap()
   const fields: FieldDef[] = [
     { key: 'title', label: 'Title', required: true },
     { key: 'type', label: 'Type', type: 'select', options: ['Session', 'Camp'] },
-    { key: 'sport', label: 'Sport' },
+    { key: 'sport_id', label: 'Sport', type: 'select', source: sportSource },
     { key: 'coach_id', label: 'Coach', type: 'select', source: coachSource },
     { key: 'team_id', label: 'Team', type: 'select', source: teamSource },
     { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource },
@@ -72,11 +75,11 @@ export function Training() {
   const columns: ColumnDef[] = [
     { key: 'title', label: 'Title' },
     { key: 'type', label: 'Type' },
-    { key: 'sport', label: 'Sport' },
+    { key: 'sport_id', label: 'Sport', render: (r) => sportName.get(String(r.sport_id ?? '')) ?? '-' },
     { key: 'coach_id', label: 'Coach' },
     { key: 'start_time', label: 'When', render: (r) => r.start_time ? new Date(String(r.start_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-' },
   ]
-  return <CrudPage title="Training & Camps" sub="Training sessions and residential camps." table="training_sessions" columns={columns} fields={fields} searchKeys={['title', 'sport']} />
+  return <CrudPage title="Training & Camps" sub="Training sessions and residential camps." table="training_sessions" columns={columns} fields={fields} searchKeys={['title']} />
 }
 
 export function Performance() {

@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SportSphere: web dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "reveal": "always" }
+    },
+    {
+      "label": "SportSphere: build web",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SportSphere: build APK",
+      "type": "shell",
+      "command": "flutter build apk --release --target-platform android-arm64 --dart-define=SUPABASE_URL=$(grep '^SUPABASE_URL=' ../.env | cut -d= -f2-) --dart-define=SUPABASE_ANON_KEY=$(grep '^SUPABASE_ANON_KEY=' ../.env | cut -d= -f2-)",
+      "options": { "cwd": "${workspaceFolder}/mobile" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SportSphere: install on phone",
+      "type": "shell",
+      "command": "\"/c/Users/Naman Gaonkar/AppData/Local/Android/Sdk/platform-tools/adb.exe\" install -r build/app/outputs/flutter-apk/app-release.apk && \"/c/Users/Naman Gaonkar/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell am start -n com.sportsphere.sportsphere/.MainActivity",
+      "options": { "cwd": "${workspaceFolder}/mobile" },
+      "problemMatcher": []
+    }
+  ]
+}

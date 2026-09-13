@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useSports, useRealtimeTable } from '../lib/hooks'
 import { StatCard, Section, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
@@ -30,11 +31,13 @@ export default function Dashboard() {
   const [counts, setCounts] = useState<Counts>({ athletes: 0, coaches: 0, teams: 0, tournaments: 0 })
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [attendance, setAttendance] = useState<{ day: string; present: number }[]>([])
+  const [teamSports, setTeamSports] = useState<{ id: string; sport_id: string | null }[]>([])
   const [loading, setLoading] = useState(true)
+  const { byId } = useSports()
 
-  useEffect(() => {
-    async function load() {
-      const [ath, coa, tea, tou, mat, att] = await Promise.all([
+  const load = useCallback(async () => {
+    {
+      const [ath, coa, tea, tou, mat, att, tsp] = await Promise.all([
         supabase.from('athletes').select('id', { count: 'exact', head: true }),
         supabase.from('coaches').select('id', { count: 'exact', head: true }),
         supabase.from('teams').select('id', { count: 'exact', head: true }),
@@ -45,6 +48,7 @@ export default function Dashboard() {
           .order('scheduled_at', { ascending: false })
           .limit(6),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+        supabase.from('teams').select('id, sport_id'),
       ])
 
       setCounts({
@@ -54,6 +58,7 @@ export default function Dashboard() {
         tournaments: tou.count ?? 0,
       })
       setMatches((mat.data as MatchRow[]) ?? [])
+      setTeamSports((tsp.data as { id: string; sport_id: string | null }[]) ?? [])
       const attRows = (att.data ?? []) as { date: string; status: string }[]
       const byDay = new Map<string, { present: number; total: number }>()
       for (const r of attRows) {
@@ -72,8 +77,24 @@ export default function Dashboard() {
       )
       setLoading(false)
     }
-    load()
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Live sync with the mobile app: any change to these tables re-runs load().
+  useRealtimeTable('teams', load)
+  useRealtimeTable('tournaments', load)
+  useRealtimeTable('matches', load)
+  useRealtimeTable('attendance', load)
+
+  const teamsBySport = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of teamSports) {
+      const key = byId(t.sport_id) || 'No sport'
+      m.set(key, (m.get(key) ?? 0) + 1)
+    }
+    return [...m.entries()].map(([name, teams]) => ({ name, teams })).sort((a, b) => b.teams - a.teams)
+  }, [teamSports, byId])
 
   if (loading) return <LoadingState />
 
@@ -127,6 +148,30 @@ export default function Dashboard() {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+        </Section>
+
+        <Section title="Teams by Sport" action={undefined}>
+          {teamsBySport.length === 0 ? (
+            <EmptyState text="No teams yet." />
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={teamsBySport} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
+                <XAxis type="number" stroke={palette.textMuted} fontSize={11} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={palette.textMuted} fontSize={11} width={130} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: palette.surface,
+                    border: `1px solid ${palette.border}`,
+                    borderRadius: 10,
+                    fontFamily: 'Lato, sans-serif',
+                  }}
+                  labelStyle={{ color: palette.black, fontWeight: 700 }}
+                />
+                <Bar dataKey="teams" fill={palette.primary} radius={[0, 6, 6, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </Section>
 

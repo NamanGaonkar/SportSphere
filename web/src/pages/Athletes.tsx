@@ -23,21 +23,23 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
+import { useRealtimeTable } from '../lib/hooks'
+import { SportMultiSelect } from '../components/SportSelect'
 import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
 type Athlete = {
   id: string
   dob: string | null
-  sport: string | null
   medical_notes: string | null
   profile_id: string
   profile: { id: string; full_name: string; contact_info: string | null } | null
   teams: { name: string } | null
+  athlete_sports: { sports: { name: string } | null }[] | null
 }
 type Team = { id: string; name: string }
 
-const empty = { full_name: '', sport: '', dob: '', team_id: '', medical_notes: '' }
+const empty = { full_name: '', sportIds: [] as string[], dob: '', team_id: '', medical_notes: '' }
 
 export default function Athletes() {
   const [rows, setRows] = useState<Athlete[]>([])
@@ -53,9 +55,11 @@ export default function Athletes() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    setLoading(true)
     const [ath, tm] = await Promise.all([
-      supabase.from('athletes').select('*, profile:profiles(id, full_name, contact_info), teams(name)').order('created_at'),
+      supabase
+        .from('athletes')
+        .select('*, profile:profiles(id, full_name, contact_info), teams(name), athlete_sports(sports(name))')
+        .order('created_at'),
       supabase.from('teams').select('id, name').order('name'),
     ])
     setRows((ath.data as unknown as Athlete[]) ?? [])
@@ -64,6 +68,7 @@ export default function Athletes() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useRealtimeTable('athletes', load)
 
   const filtered = useMemo(
     () => rows.filter((r) => (r.profile?.full_name ?? '').toLowerCase().includes(q.toLowerCase())),
@@ -82,14 +87,14 @@ export default function Athletes() {
       if (pErr) { setError(pErr.message); return }
       const { error } = await supabase
         .from('athletes')
-        .update({
-          sport: form.sport || null,
-          dob: form.dob || null,
-          team_id: form.team_id || null,
-          medical_notes: form.medical_notes || null,
-        })
+        .update({ dob: form.dob || null, team_id: form.team_id || null, medical_notes: form.medical_notes || null })
         .eq('id', editing)
       if (error) { setError(error.message); return }
+      // Replace the sport tags wholesale (join-table sync).
+      await supabase.from('athlete_sports').delete().eq('athlete_id', editing)
+      if (form.sportIds.length) {
+        await supabase.from('athlete_sports').insert(form.sportIds.map((sid) => ({ athlete_id: editing, sport_id: sid })))
+      }
     } else {
       const { data: profile, error: pErr } = await supabase
         .from('profiles')
@@ -97,14 +102,15 @@ export default function Athletes() {
         .select('id')
         .single()
       if (pErr || !profile) { setError(pErr?.message ?? 'Could not create profile'); return }
-      const { error } = await supabase.from('athletes').insert({
-        profile_id: profile.id,
-        sport: form.sport || null,
-        dob: form.dob || null,
-        team_id: form.team_id || null,
-        medical_notes: form.medical_notes || null,
-      })
+      const { data: athlete, error } = await supabase
+        .from('athletes')
+        .insert({ profile_id: profile.id, dob: form.dob || null, team_id: form.team_id || null, medical_notes: form.medical_notes || null })
+        .select('id')
+        .single()
       if (error) { setError(error.message); return }
+      if (athlete && form.sportIds.length) {
+        await supabase.from('athlete_sports').insert(form.sportIds.map((sid) => ({ athlete_id: athlete.id, sport_id: sid })))
+      }
     }
 
     setShowForm(false)
@@ -125,22 +131,33 @@ export default function Athletes() {
     setEditProfileId(r.profile?.id ?? null)
     setForm({
       full_name: r.profile?.full_name ?? '',
-      sport: r.sport ?? '',
+      sportIds: [],
       dob: r.dob ?? '',
       team_id: '',
       medical_notes: r.medical_notes ?? '',
     })
     setShowForm(true)
+    // sport ids come from a follow-up fetch (names are embedded in the list query)
+    void supabase
+      .from('athlete_sports')
+      .select('sport_id')
+      .eq('athlete_id', r.id)
+      .then(({ data }) => {
+        setForm((f) => ({ ...f, sportIds: ((data ?? []) as { sport_id: string }[]).map((d) => d.sport_id) }))
+      })
   }
 
   const age = (dob: string | null) =>
     dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 86400000)) : null
 
+  const sportNames = (r: Athlete) =>
+    (r.athlete_sports ?? []).map((x) => x.sports?.name).filter(Boolean).join(', ') || '-'
+
   return (
     <Box>
       <PageHead
         title="Athletes"
-        sub="Roster management - profiles, sport, team and medical notes."
+        sub="Roster management - profiles, sports, team and medical notes."
         action={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setEditProfileId(null); setForm({ ...empty }); setShowForm(true) }}>
             Add Athlete
@@ -177,7 +194,7 @@ export default function Athletes() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Name</TableCell>
-                    <TableCell>Sport</TableCell>
+                    <TableCell>Sports</TableCell>
                     <TableCell>Team</TableCell>
                     <TableCell>Age</TableCell>
                     <TableCell>Medical</TableCell>
@@ -190,7 +207,7 @@ export default function Athletes() {
                     .map((r) => (
                       <TableRow key={r.id} hover>
                         <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
-                        <TableCell>{r.sport ?? '-'}</TableCell>
+                        <TableCell>{sportNames(r)}</TableCell>
                         <TableCell>{r.teams?.name ?? '-'}</TableCell>
                         <TableCell>{age(r.dob) ?? '-'}</TableCell>
                         <TableCell>
@@ -230,7 +247,7 @@ export default function Athletes() {
           <DialogContent dividers>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
               <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required fullWidth />
-              <TextField label="Sport" value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} fullWidth />
+              <SportMultiSelect value={form.sportIds} onChange={(v) => setForm({ ...form, sportIds: v })} />
               <TextField type="date" label="Date of birth" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
               <TextField select label="Team" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })} fullWidth>
                 <MenuItem value="">None</MenuItem>

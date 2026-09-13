@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useSports, useRealtimeTable } from '../lib/hooks'
 import { PageHead, Section, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
@@ -15,30 +16,40 @@ import { palette } from '../theme'
 
 const CHART_COLORS = [palette.primary, palette.success, palette.warning, palette.error, palette.info, palette.textMuted]
 
-type SportCount = { sport: string | null; count: number }
+type SportCount = { sports: { name: string } | null }
 type AttRow = { date: string; status: string }
 type AwardRow = { id: string; title: string; date: string | null; level: string | null; athletes: { profile: { full_name: string } | null } | null }
 
 export default function Reports() {
   const [sportData, setSportData] = useState<{ name: string; value: number }[]>([])
+  const [teamsSportData, setTeamsSportData] = useState<{ name: string; value: number }[]>([])
   const [attData, setAttData] = useState<{ day: string; present: number }[]>([])
   const [awards, setAwards] = useState<AwardRow[]>([])
   const [loading, setLoading] = useState(true)
+  const { byId } = useSports()
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [ath, att, aw] = await Promise.all([
-      supabase.from('athletes').select('sport'),
+    const [ajs, tms, att, aw] = await Promise.all([
+      supabase.from('athlete_sports').select('sports(name)'),
+      supabase.from('teams').select('sport_id'),
       supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)),
       supabase.from('awards').select('*, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(8),
     ])
-    const sports = (ath.data as SportCount[]) ?? []
+    // Athletes by sport: one entry per athlete-sport tag (multi-sport aware).
     const m = new Map<string, number>()
-    for (const s of sports) {
-      const key = s.sport ?? 'Unassigned'
+    for (const s of ((ajs.data ?? []) as unknown as SportCount[])) {
+      const key = s.sports?.name ?? 'Unassigned'
       m.set(key, (m.get(key) ?? 0) + 1)
     }
     setSportData([...m.entries()].map(([name, value]) => ({ name, value })))
+
+    const tm = new Map<string, number>()
+    for (const t of (tms.data as { sport_id: string | null }[]) ?? []) {
+      const key = byId(t.sport_id) || 'No sport'
+      tm.set(key, (tm.get(key) ?? 0) + 1)
+    }
+    setTeamsSportData([...tm.entries()].map(([name, value]) => ({ name, value })))
 
     const rows = (att.data as AttRow[]) ?? []
     const byDay = new Map<string, { present: number; total: number }>()
@@ -59,6 +70,8 @@ export default function Reports() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useRealtimeTable('athlete_sports', load)
+  useRealtimeTable('teams', load)
 
   const tooltipStyle = {
     background: palette.surface,
@@ -82,6 +95,22 @@ export default function Reports() {
               <PieChart>
                 <Pie data={sportData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={3}>
                   {sportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </Section>
+
+        <Section title="Teams by Sport">
+          {teamsSportData.length === 0 ? (
+            <EmptyState text="No team data yet." />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie data={teamsSportData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={3}>
+                  {teamsSportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend />

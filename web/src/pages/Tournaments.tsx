@@ -21,6 +21,8 @@ import AddIcon from '@mui/icons-material/Add'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
+import { useRealtimeTable } from '../lib/hooks'
+import { SportSelect, SportFilter } from '../components/SportSelect'
 import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
@@ -30,11 +32,13 @@ type Tournament = {
   level: string
   start_date: string | null
   end_date: string | null
+  sport_id: string | null
+  sports: { name: string } | null
   venues: { name: string } | null
   matches: { count: number }[] | null
 }
 
-const empty = { name: '', level: 'School', start_date: '', end_date: '', venue_id: '' }
+const empty = { name: '', level: 'School', sport_id: '', start_date: '', end_date: '', venue_id: '' }
 
 const levelColor = (l: string) =>
   l === 'National' ? 'error' : l === 'State' ? 'warning' : l === 'District' ? 'info' : 'success'
@@ -42,6 +46,7 @@ const levelColor = (l: string) =>
 export default function Tournaments() {
   const [rows, setRows] = useState<Tournament[]>([])
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([])
+  const [filterS, setFilterS] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
@@ -51,9 +56,8 @@ export default function Tournaments() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    setLoading(true)
     const [tr, vn] = await Promise.all([
-      supabase.from('tournaments').select('*, venues(name), matches(count)').order('start_date', { ascending: false }),
+      supabase.from('tournaments').select('*, sports(name), venues(name), matches(count)').order('start_date', { ascending: false }),
       supabase.from('venues').select('id, name').order('name'),
     ])
     setRows((tr.data as unknown as Tournament[]) ?? [])
@@ -62,8 +66,15 @@ export default function Tournaments() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useRealtimeTable('tournaments', load)
 
-  const sorted = useMemo(() => [...rows].sort((a, b) => a.name.localeCompare(b.name)), [rows])
+  const sorted = useMemo(
+    () =>
+      [...rows]
+        .filter((r) => !filterS || r.sport_id === filterS)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [rows, filterS],
+  )
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -71,6 +82,7 @@ export default function Tournaments() {
     const payload = {
       name: form.name,
       level: form.level,
+      sport_id: form.sport_id || null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       venue_id: form.venue_id || null,
@@ -96,6 +108,7 @@ export default function Tournaments() {
     setForm({
       name: t.name,
       level: t.level,
+      sport_id: t.sport_id ?? '',
       start_date: t.start_date ?? '',
       end_date: t.end_date ?? '',
       venue_id: '',
@@ -117,6 +130,8 @@ export default function Tournaments() {
         }
       />
 
+      <SportFilter value={filterS} onChange={(v) => { setFilterS(v); setPage(0) }} />
+
       <Paper>
         {loading ? (
           <LoadingState />
@@ -129,6 +144,7 @@ export default function Tournaments() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Name</TableCell>
+                    <TableCell>Sport</TableCell>
                     <TableCell>Level</TableCell>
                     <TableCell>Dates</TableCell>
                     <TableCell>Venue</TableCell>
@@ -142,6 +158,7 @@ export default function Tournaments() {
                     .map((t) => (
                       <TableRow key={t.id} hover>
                         <TableCell>{t.name}</TableCell>
+                        <TableCell>{t.sports?.name ?? '-'}</TableCell>
                         <TableCell><Badge color={levelColor(t.level)}>{t.level}</Badge></TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{fmt(t.start_date)} to {fmt(t.end_date)}</TableCell>
                         <TableCell>{t.venues?.name ?? '-'}</TableCell>
@@ -181,6 +198,7 @@ export default function Tournaments() {
               <TextField select label="Level" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} fullWidth>
                 {['School', 'District', 'State', 'National'].map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
               </TextField>
+              <SportSelect value={form.sport_id} onChange={(v) => setForm({ ...form, sport_id: v })} emptyLabel="No sport" />
               <TextField type="date" label="Start date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
               <TextField type="date" label="End date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
               <TextField select label="Venue" value={form.venue_id} onChange={(e) => setForm({ ...form, venue_id: e.target.value })} fullWidth>

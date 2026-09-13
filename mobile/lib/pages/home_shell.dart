@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/sports.dart';
 import 'attendance_page.dart';
 import 'notifications_page.dart';
 import 'schedule_page.dart';
@@ -59,12 +60,30 @@ class _HomePageState extends State<HomePage> {
   int _coaches = 0;
   int _teams = 0;
   int _tournaments = 0;
+  List<Map<String, dynamic>> _teamRows = [];
   Map<String, dynamic>? _nextMatch;
+  final List<RealtimeChannel> _channels = [];
 
   @override
   void initState() {
     super.initState();
+    SportsCache.instance.addListener(_onSports);
+    _channels.add(listen('teams', _load));
+    _channels.add(listen('tournaments', _load));
+    _channels.add(listen('matches', _load));
+    _channels.add(listen('attendance', _load));
     _load();
+  }
+
+  void _onSports() => setState(() {});
+
+  @override
+  void dispose() {
+    SportsCache.instance.removeListener(_onSports);
+    for (final c in _channels) {
+      Supabase.instance.client.removeChannel(c);
+    }
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -76,7 +95,7 @@ class _HomePageState extends State<HomePage> {
       client.from('profiles').select('full_name, role').eq('id', uid).maybeSingle(),
       client.from('athletes').select('id'),
       client.from('coaches').select('id'),
-      client.from('teams').select('id'),
+      client.from('teams').select('id, sport_id'),
       client.from('tournaments').select('id'),
       client
           .from('matches')
@@ -95,11 +114,24 @@ class _HomePageState extends State<HomePage> {
       _role = (profile?['role'] ?? '').toString();
       _athletes = (results[1] as List).length;
       _coaches = (results[2] as List).length;
-      _teams = (results[3] as List).length;
+      _teamRows = (results[3] as List).cast<Map<String, dynamic>>();
+      _teams = _teamRows.length;
       _tournaments = (results[4] as List).length;
       _nextMatch = results[5] as Map<String, dynamic>?;
       _loading = false;
     });
+  }
+
+  /// "Teams by sport" counts, resolved live through the sports cache.
+  Map<String, int> get _teamsBySport {
+    final m = <String, int>{};
+    for (final t in _teamRows) {
+      final name = SportsCache.instance.name(t['sport_id'] as String?);
+      final key = name.isEmpty ? 'No sport' : name;
+      m[key] = (m[key] ?? 0) + 1;
+    }
+    final entries = m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return Map.fromEntries(entries);
   }
 
   @override
@@ -136,7 +168,7 @@ class _HomePageState extends State<HomePage> {
                     final itemWidth = (constraints.maxWidth - gap * (cols - 1)) / cols;
                     final items = [
                       _StatCard(label: 'ATHLETES', value: '$_athletes', sub: 'Active roster'),
-                      _StatCard(label: 'COACHES', value: '$_coaches', sub: 'Across all sports'),
+                      _StatCard(label: 'COACHES', value: '$_coaches', sub: _teamsBySport.isEmpty ? 'Across all sports' : 'In ${_teamsBySport.length} sport(s)'),
                       _StatCard(label: 'TEAMS', value: '$_teams', sub: 'Registered squads'),
                       _StatCard(label: 'TOURNAMENTS', value: '$_tournaments', sub: 'All levels'),
                     ];
@@ -153,6 +185,42 @@ class _HomePageState extends State<HomePage> {
                     );
                   }),
                   const SizedBox(height: 16),
+                  if (_teamsBySport.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('TEAMS BY SPORT', style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700,
+                              letterSpacing: 1, color: Colors.black54)),
+                            const SizedBox(height: 10),
+                            for (final e in _teamsBySport.entries)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text(e.key, style: const TextStyle(fontSize: 14))),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF6A13).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text('${e.value}', style: const TextStyle(
+                                        fontSize: 12.5, fontWeight: FontWeight.w700,
+                                        color: Color(0xFFB24A00))),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   _NextMatchCard(match: _nextMatch),
                 ],
               ),

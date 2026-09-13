@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SportSphere: Live Web Preview (Edge)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web/src",
+      "runtimeExecutable": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+      "runtimeArgs": ["--incognito"],
+      "presentation": {
+        "group": "sportsphere",
+        "order": 1
+      }
+    },
+    {
+      "name": "SportSphere: Flutter (phone)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/mobile/lib/main.dart",
+      "cwd": "${workspaceFolder}/mobile",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=${env:SUPABASE_URL}",
+        "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_ANON_KEY}"
+      ],
+      "presentation": {
+        "group": "sportsphere",
+        "order": 2
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "SportSphere: Full Preview (web + phone)",
+      "configurations": ["SportSphere: Live Web Preview (Edge)", "SportSphere: Flutter (phone)"]
+    }
+  ]
+}

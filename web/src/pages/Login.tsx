@@ -13,7 +13,6 @@ import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
-import SportsScoreIcon from '@mui/icons-material/SportsScore'
 import { supabase } from '../lib/supabase'
 
 // Roles available at public signup. Admin is NOT selectable — the single
@@ -64,12 +63,33 @@ export default function Login() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: { xs: 'column', md: 'row' } }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, position: 'relative' }}>
+      {/* Background image at ~55% opacity under everything */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'url(/background.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          opacity: 0.55,
+        }}
+      />
+      {/* Dark veil so text stays readable over the photo */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(90deg, rgba(10,10,10,0.82) 0%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.35) 100%)',
+        }}
+      />
+
       {/* Brand panel */}
       <Box
         sx={{
+          position: 'relative',
+          zIndex: 1,
           flex: { md: '0 0 44%' },
-          bgcolor: 'common.black',
           color: 'common.white',
           display: 'flex',
           flexDirection: 'column',
@@ -78,24 +98,25 @@ export default function Login() {
           py: { xs: 6, md: 0 },
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-          <Box sx={{ width: 44, height: 44, borderRadius: 2.5, bgcolor: 'primary.main', display: 'grid', placeItems: 'center' }}>
-            <SportsScoreIcon sx={{ fontSize: 26, color: 'common.white' }} />
-          </Box>
-          <Typography sx={{ fontSize: 24, fontWeight: 700 }}>SportSphere</Typography>
-        </Box>
+        <Box component="img" src="/logo.png" alt="SportSphere" sx={{ width: 148, height: 'auto', mb: 2, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.6))' }} />
+        <Typography sx={{ fontSize: 22, fontWeight: 700, letterSpacing: 2 }}>
+          SPORT<span style={{ color: '#FF5500' }}>SPHERE</span>
+        </Typography>
+        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 2.4, mb: 3 }}>
+          ELEVATE EVERY GAME
+        </Typography>
         <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.25, maxWidth: 460 }}>
           Sports organization management, in one place.
         </Typography>
-        <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 2, maxWidth: 420 }}>
+        <Typography sx={{ color: 'rgba(255,255,255,0.72)', mt: 2, maxWidth: 420, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
           Manage athletes, coaches, teams, tournaments, venues and operations from a single
           platform built for clubs, academies and school sports bodies.
         </Typography>
       </Box>
 
       {/* Form panel */}
-      <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', p: 3 }}>
-        <Paper sx={{ width: '100%', maxWidth: 400, p: 4 }}>
+      <Box sx={{ position: 'relative', zIndex: 1, flex: 1, display: 'grid', placeItems: 'center', p: 3 }}>
+        <Paper sx={{ width: '100%', maxWidth: 400, p: 4, bgcolor: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(6px)' }}>
           <Tabs value={mode} onChange={(_, v) => { setMode(v); setError(''); setNotice('') }} sx={{ mb: 3 }}>
             <Tab label="Sign in" />
             <Tab label="Sign up" />

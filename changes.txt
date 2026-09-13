@@ -31,6 +31,24 @@ flutter build apk --release --target-platform android-arm64 \
   --dart-define=SUPABASE_URL="$(grep '^SUPABASE_URL=' ../.env | cut -d= -f2-)" \
   --dart-define=SUPABASE_ANON_KEY="$(grep '^SUPABASE_ANON_KEY=' ../.env | cut -d= -f2-)"
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SPORTS SYSTEM + LIVE SYNC (2026-09-13)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DB (applied via access token, supabase/migrate_sports.sql — idempotent):
+- `sports` table = single source of truth (10 sports seeded). Admin manages it on web → /sports; both apps read it live.
+- teams / tournaments / training_sessions now link via sport_id (legacy text kept as sport_legacy).
+- Multi-sport athletes via `athlete_sports` join table (Athlete One = Football + Kabaddi).
+- All 6 test users now have REAL relational data: Coach One owns Falcons U-18/U-16, Athlete One is on Falcons U-18, HR/Finance staff rows re-pointed to their logins, Venue Manager got a staff row + payroll.
+- 14 days of attendance seeded for ALL 6 users (84 rows), Leave rows have reasons.
+- Fixed RLS: users can now UPDATE their own attendance (was insert-only — this is why attendance "didn't work").
+- REALTIME enabled on 9 tables → edits on web appear on the phone instantly and vice versa (sports, teams, tournaments, training, matches, attendance, athletes, athlete_sports, notifications).
+
+Web: Sports admin page (admin-only), Sport dropdown on Team/Tournament/Training forms, Sport filter on Teams/Tournaments/Fixtures, multi-sport picker on Athletes, "Teams by sport" + "Athletes by sport" charts on Dashboard/Reports, leave-reason dialog on Attendance, live sync everywhere.
+
+Mobile: onboarding FIXED — only the background images cross-fade now; Sign in / Create account buttons and text stay fixed (no more whole page sliding). Schedule got sport filter chips + sport badges, Home got Teams-by-Sport card, Attendance got leave-reason dialog, all realtime-synced. Rebuilt + installed via adb (Success).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ All 21 modules — now in the web app
 
 Athlete · Coach · Staff & HR · Attendance & Leave · Payroll (view) · Venues · Housekeeping · Inventory · Vendors & Purchases · Tournaments (School/District/State/National) · Teams & Players · Fixtures/Matches/Results · School Activities · Training & Camps · Performance & Medical · Awards · Events · Transport · Accommodation · Finance & Expenses · Reports & Dashboard + role-based access (Admin sees all, Athlete sees their own data via RLS).

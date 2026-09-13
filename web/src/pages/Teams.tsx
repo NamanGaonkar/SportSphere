@@ -23,24 +23,28 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
+import { useRealtimeTable } from '../lib/hooks'
+import { SportSelect, SportFilter } from '../components/SportSelect'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
 type Team = {
   id: string
   name: string
-  sport: string
+  sport_id: string | null
   coach_id: string | null
+  sports: { name: string } | null
   coaches: { profile: { full_name: string } | null } | null
   athletes: { count: number }[] | null
 }
 
-const empty = { name: '', sport: '', coach_id: '' }
+const empty = { name: '', sport_id: '', coach_id: '' }
 
 export default function Teams() {
   const [rows, setRows] = useState<Team[]>([])
   const [coaches, setCoaches] = useState<{ id: string; profile: { full_name: string } | null }[]>([])
   const [q, setQ] = useState('')
+  const [filterS, setFilterS] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
@@ -50,9 +54,8 @@ export default function Teams() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    setLoading(true)
     const [tm, co] = await Promise.all([
-      supabase.from('teams').select('*, coaches(*, profile:profiles(full_name)), athletes(count)').order('name'),
+      supabase.from('teams').select('*, sports(name), coaches(*, profile:profiles(full_name)), athletes(count)').order('name'),
       supabase.from('coaches').select('id, profile:profiles(full_name)').order('id'),
     ])
     setRows((tm.data as unknown as Team[]) ?? [])
@@ -61,15 +64,24 @@ export default function Teams() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useRealtimeTable('teams', load)
 
-  const filtered = useMemo(() => rows.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())), [rows, q])
+  const filtered = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q.toLowerCase()) &&
+          (!filterS || r.sport_id === filterS),
+      ),
+    [rows, q, filterS],
+  )
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     const payload = {
       name: form.name,
-      sport: form.sport,
+      sport_id: form.sport_id || null,
       coach_id: form.coach_id || null,
     }
     const { error } = editing
@@ -90,7 +102,7 @@ export default function Teams() {
 
   function openEdit(t: Team) {
     setEditing(t.id)
-    setForm({ name: t.name, sport: t.sport, coach_id: t.coach_id ?? '' })
+    setForm({ name: t.name, sport_id: t.sport_id ?? '', coach_id: t.coach_id ?? '' })
     setShowForm(true)
   }
 
@@ -106,22 +118,25 @@ export default function Teams() {
         }
       />
 
-      <TextField
-        size="small"
-        placeholder="Search teams"
-        value={q}
-        onChange={(e) => { setQ(e.target.value); setPage(0) }}
-        sx={{ mb: 2, width: 280 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <TextField
+          size="small"
+          placeholder="Search teams"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setPage(0) }}
+          sx={{ width: 280 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <SportFilter value={filterS} onChange={(v) => { setFilterS(v); setPage(0) }} />
+      </Box>
 
       <Paper>
         {loading ? (
@@ -147,7 +162,7 @@ export default function Teams() {
                     .map((t) => (
                       <TableRow key={t.id} hover>
                         <TableCell>{t.name}</TableCell>
-                        <TableCell>{t.sport}</TableCell>
+                        <TableCell>{t.sports?.name ?? '-'}</TableCell>
                         <TableCell>{t.coaches?.profile?.full_name ?? '-'}</TableCell>
                         <TableCell>{t.athletes?.[0]?.count ?? 0} athletes</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -182,7 +197,11 @@ export default function Teams() {
           <DialogContent dividers>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
               <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
-              <TextField label="Sport" value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} required fullWidth />
+              <SportSelect
+                value={form.sport_id}
+                onChange={(v) => setForm({ ...form, sport_id: v })}
+                emptyLabel="No sport"
+              />
               <TextField select label="Coach" value={form.coach_id} onChange={(e) => setForm({ ...form, coach_id: e.target.value })} fullWidth>
                 <MenuItem value="">None</MenuItem>
                 {coaches.map((c) => (

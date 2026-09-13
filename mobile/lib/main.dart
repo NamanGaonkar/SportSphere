@@ -66,6 +66,9 @@ class SportSphereApp extends StatelessWidget {
         centerTitle: false,
         titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Brand.black),
       ),
+      dropdownMenuTheme: const DropdownMenuThemeData(
+        textStyle: TextStyle(color: Brand.black, fontSize: 15),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
