@@ -6,8 +6,74 @@ import 'pages/splash_page.dart';
 
 /// Supabase credentials are injected at build time, e.g.:
 /// flutter build apk --release --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
-const kSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const kSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+/// Values are sanitized: shell pipelines on Windows (CRLF .env) can leave a
+/// trailing \r or quotes in the dart-define, which breaks Uri parsing with
+/// "Invalid argument(s): no host specified in URL" at sign-in time.
+String _sanitize(String raw) {
+  var v = raw.trim();
+  while (v.isNotEmpty && (v.codeUnitAt(0) == 0x0D || v.codeUnitAt(0) == 0x0A)) {
+    v = v.substring(1);
+  }
+  while (v.isNotEmpty &&
+      (v.codeUnitAt(v.length - 1) == 0x0D || v.codeUnitAt(v.length - 1) == 0x0A)) {
+    v = v.substring(0, v.length - 1);
+  }
+  if (v.length >= 2 &&
+      ((v.startsWith('"') && v.endsWith('"')) ||
+          (v.startsWith("'") && v.endsWith("'")))) {
+    v = v.substring(1, v.length - 1).trim();
+  }
+  return v;
+}
+
+const _rawSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const _rawSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+final kSupabaseUrl = _sanitize(_rawSupabaseUrl);
+final kSupabaseAnonKey = _sanitize(_rawSupabaseAnonKey);
+
+bool get _envValid =>
+    kSupabaseUrl.startsWith('https://') &&
+    Uri.tryParse(kSupabaseUrl)?.host.isNotEmpty == true &&
+    kSupabaseAnonKey.length > 40;
+
+/// Shown when build-time credentials are missing/corrupted, instead of a
+/// cryptic runtime failure at sign-in.
+class ConfigErrorApp extends StatelessWidget {
+  const ConfigErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Brand.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset('assets/images/logo.png', height: 84),
+                const SizedBox(height: 24),
+                const Text('Configuration error',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                Text(
+                  'Supabase credentials were not injected correctly at build time.'
+                  ' Rebuild the APK with --dart-define=SUPABASE_URL and'
+                  ' --dart-define=SUPABASE_ANON_KEY.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13.5, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 // SportSphere brand — mirrors web/src/theme.ts (single source of truth on web).
 class Brand {
@@ -22,6 +88,10 @@ Future<void> main() async {
   // Edge-to-edge: draw behind the status bar so dark screens control the
   // status bar icon color themselves (fixes invisible battery/clock icons).
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  if (!_envValid) {
+    runApp(const ConfigErrorApp());
+    return;
+  }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseAnonKey);
   runApp(const SportSphereApp());
 }

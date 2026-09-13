@@ -105,7 +105,6 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  bool _collapsed = false;
   String? _role;
   String _current = 'Dashboard';
   List<_NavSection> _sections = const [];
@@ -169,30 +168,21 @@ class _HomeShellState extends State<HomeShell> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header: collapse toggle + logo + name (web drawer parity).
+              // Header: logo + app name (fixed drawer, no collapse toggle).
               Padding(
-                padding: EdgeInsets.fromLTRB(_collapsed ? 8 : 18, 14, 8, 14),
+                padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(_collapsed ? Icons.menu : Icons.menu_open,
-                          color: Colors.white70, size: 22),
-                      onPressed: () => setState(() => _collapsed = !_collapsed),
-                      tooltip: _collapsed ? 'Expand menu' : 'Collapse menu',
+                    Image.asset('assets/images/logo.png', width: 28, height: 32, fit: BoxFit.contain),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('SportSphere',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              letterSpacing: 0.2)),
                     ),
-                    if (!_collapsed) ...[
-                      const SizedBox(width: 6),
-                      Image.asset('assets/images/logo.png', width: 28, height: 32, fit: BoxFit.contain),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text('SportSphere',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                                letterSpacing: 0.2)),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -202,64 +192,54 @@ class _HomeShellState extends State<HomeShell> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   children: [
                     for (final s in _sections) ...[
-                      if (!_collapsed)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
-                          child: Text(s.section.toUpperCase(),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.2,
-                                  color: Colors.white.withValues(alpha: 0.42))),
-                        ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
+                        child: Text(s.section.toUpperCase(),
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: Colors.white.withValues(alpha: 0.42))),
+                      ),
                       for (final item in s.items)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Tooltip(
-                            message: _collapsed ? item.label : '',
-                            triggerMode: TooltipTriggerMode.tap,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () {
-                                setState(() => _current = item.label);
-                                Navigator.pop(context);
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: _collapsed ? 10 : 12, vertical: 11),
-                                margin: const EdgeInsets.symmetric(vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: _current == item.label
-                                      ? Brand.primary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: _collapsed
-                                      ? MainAxisAlignment.center
-                                      : MainAxisAlignment.start,
-                                  children: [
-                                    Icon(item.icon,
-                                        size: 20,
-                                        color: _current == item.label
-                                            ? Colors.white
-                                            : Colors.white70),
-                                    if (!_collapsed) ...[
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Text(item.label,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.white
-                                                    .withValues(alpha: _current == item.label ? 1 : 0.72),
-                                                fontWeight: _current == item.label
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w400)),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              setState(() => _current = item.label);
+                              Navigator.pop(context);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 11),
+                              margin: const EdgeInsets.symmetric(vertical: 1),
+                              decoration: BoxDecoration(
+                                color: _current == item.label
+                                    ? Brand.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(item.icon,
+                                      size: 20,
+                                      color: _current == item.label
+                                          ? Colors.white
+                                          : Colors.white70),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(item.label,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.white
+                                                .withValues(alpha: _current == item.label ? 1 : 0.72),
+                                            fontWeight: _current == item.label
+                                                ? FontWeight.w700
+                                                : FontWeight.w400)),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -270,38 +250,32 @@ class _HomeShellState extends State<HomeShell> {
               ),
               const Divider(color: Colors.white12, height: 1),
               Padding(
-                padding: EdgeInsets.all(_collapsed ? 8 : 14),
-                child: _collapsed
-                    ? IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
-                        onPressed: _signOut,
-                        tooltip: 'Sign out',
-                      )
-                    : Row(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  Supabase.instance.client.auth.currentUser?.email ?? '',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
-                                ),
-                                Text(_role ?? '',
-                                    style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
-                              ],
-                            ),
+                          Text(
+                            Supabase.instance.client.auth.currentUser?.email ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
-                            onPressed: _signOut,
-                            tooltip: 'Sign out',
-                          ),
+                          Text(_role ?? '',
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
+                      onPressed: _signOut,
+                      tooltip: 'Sign out',
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

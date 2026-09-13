@@ -7,13 +7,10 @@ import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
-import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
 import Button from '@mui/material/Button'
-import IconButton from '@mui/material/IconButton'
 import LinearProgress from '@mui/material/LinearProgress'
-import MenuIcon from '@mui/icons-material/Menu'
 import LogoutIcon from '@mui/icons-material/Logout'
 import {
   Dashboard as DashboardIcon, BarChart as ReportsIcon,
@@ -126,7 +123,6 @@ const NAV_SECTIONS: {
 export default function App() {
   const [session, setSession] = useState<Session>(null)
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -193,7 +189,7 @@ export default function App() {
   }
 
   const role = session.profile?.role ?? 'Athlete'
-  const drawerWidth = collapsed ? 72 : 240
+  const drawerWidth = 240
 
   return (
     <SessionContext.Provider value={session}>
@@ -215,28 +211,16 @@ export default function App() {
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: collapsed ? 1 : 2.5, py: 2 }}>
-            <IconButton
-              size="small"
-              onClick={() => setCollapsed(!collapsed)}
-              aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
-              sx={{ color: 'rgba(255,255,255,0.72)', '&:hover': { color: 'primary.main' } }}
-            >
-              <MenuIcon />
-            </IconButton>
-            {!collapsed && (
-              <>
-                <Box
-                  component="img"
-                  src="/logo.png"
-                  alt="SportSphere"
-                  sx={{ width: 30, height: 34, objectFit: 'contain', flexShrink: 0 }}
-                />
-                <Typography sx={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.2 }} noWrap>
-                  SportSphere
-                </Typography>
-              </>
-            )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 2 }}>
+            <Box
+              component="img"
+              src="/logo.png"
+              alt="SportSphere"
+              sx={{ width: 30, height: 34, objectFit: 'contain', flexShrink: 0 }}
+            />
+            <Typography sx={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.2 }} noWrap>
+              SportSphere
+            </Typography>
           </Box>
           <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
           <Box
@@ -252,108 +236,83 @@ export default function App() {
           >
             {visibleSections.map((s) => (
               <List key={s.section} disablePadding>
-                {!collapsed && (
-                  <Typography
-                    sx={{
-                      px: 2.5,
-                      pt: 2,
-                      pb: 0.5,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      letterSpacing: 1.2,
-                      textTransform: 'uppercase',
-                      color: 'rgba(255,255,255,0.45)',
-                    }}
-                  >
-                    {s.section}
-                  </Typography>
-                )}
-                {collapsed && <Box sx={{ height: 10 }} />}
+                <Typography
+                  sx={{
+                    px: 2.5,
+                    pt: 2,
+                    pb: 0.5,
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: 1.2,
+                    textTransform: 'uppercase',
+                    color: 'rgba(255,255,255,0.45)',
+                  }}
+                >
+                  {s.section}
+                </Typography>
                 {s.items.map((i) => {
                   const active = location.pathname === i.to
                   const Icon = i.icon
                   return (
-                    <Tooltip key={i.to} title={collapsed ? i.label : ''} placement="right" disableHoverListener={!collapsed} arrow>
-                      <ListItemButton
-                        selected={active}
-                        onClick={() => navigate(i.to)}
-                        sx={{
-                          mx: 1,
-                          mb: 0.25,
-                          borderRadius: 1.5,
-                          py: 1,
-                          minHeight: 42,
-                          justifyContent: collapsed ? 'center' : 'flex-start',
-                          px: collapsed ? 1.5 : 2,
-                          color: 'rgba(255,255,255,0.72)',
-                          '&.Mui-selected': {
-                            bgcolor: 'primary.main',
-                            color: 'common.white',
-                            '&:hover': { bgcolor: 'secondary.main' },
+                    <ListItemButton
+                      key={i.to}
+                      selected={active}
+                      onClick={() => navigate(i.to)}
+                      sx={{
+                        mx: 1,
+                        mb: 0.25,
+                        borderRadius: 1.5,
+                        py: 1,
+                        minHeight: 42,
+                        px: 2,
+                        color: 'rgba(255,255,255,0.72)',
+                        '&.Mui-selected': {
+                          bgcolor: 'primary.main',
+                          color: 'common.white',
+                          '&:hover': { bgcolor: 'secondary.main' },
+                        },
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 36, color: 'inherit', justifyContent: 'center' }}>
+                        <Icon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i.label}
+                        slotProps={{
+                          primary: {
+                            sx: { fontSize: 13.5, fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' },
                           },
-                          '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
                         }}
-                      >
-                        <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, color: 'inherit', justifyContent: 'center' }}>
-                          <Icon fontSize="small" />
-                        </ListItemIcon>
-                        {!collapsed && (
-                          <ListItemText
-                            primary={i.label}
-                            slotProps={{
-                              primary: {
-                                sx: { fontSize: 13.5, fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' },
-                              },
-                            }}
-                          />
-                        )}
-                      </ListItemButton>
-                    </Tooltip>
+                      />
+                    </ListItemButton>
                   )
                 })}
               </List>
             ))}
           </Box>
-          <Box sx={{ p: collapsed ? 1 : 2, borderTop: '1px solid rgba(255,255,255,0.12)', textAlign: collapsed ? 'center' : 'left' }}>
-            {!collapsed && (
-              <>
-                <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
-                  {session.profile?.full_name ?? session.user.email}
-                </Typography>
-                <Typography sx={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', mb: 1 }}>{role}</Typography>
-              </>
-            )}
-            {collapsed ? (
-              <IconButton
-                size="small"
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  navigate('/login')
-                }}
-                aria-label="Sign out"
-                sx={{ color: 'rgba(255,255,255,0.72)', '&:hover': { color: 'primary.main' } }}
-              >
-                <LogoutIcon fontSize="small" />
-              </IconButton>
-            ) : (
-              <Button
-                fullWidth
-                size="small"
-                startIcon={<LogoutIcon />}
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  navigate('/login')
-                }}
-                sx={{
-                  color: 'rgba(255,255,255,0.72)',
-                  borderColor: 'rgba(255,255,255,0.25)',
-                  '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
-                }}
-                variant="outlined"
-              >
-                Sign out
-              </Button>
-            )}
+          <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
+              {session.profile?.full_name ?? session.user.email}
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', mb: 1 }}>{role}</Typography>
+            <Button
+              fullWidth
+              size="small"
+              startIcon={<LogoutIcon />}
+              onClick={async () => {
+                await supabase.auth.signOut()
+                navigate('/login')
+              }}
+              sx={{
+                color: 'rgba(255,255,255,0.72)',
+                borderColor: 'rgba(255,255,255,0.25)',
+                '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
+              }}
+              variant="outlined"
+            >
+              Sign out
+            </Button>
           </Box>
         </Drawer>
 

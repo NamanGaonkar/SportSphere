@@ -72,6 +72,8 @@ export default function Reports() {
   useEffect(() => { load() }, [load])
   useRealtimeTable('athlete_sports', load)
   useRealtimeTable('teams', load)
+  useRealtimeTable('attendance', load)
+  useRealtimeTable('awards', load)
 
   const tooltipStyle = {
     background: palette.surface,
@@ -136,6 +138,8 @@ export default function Reports() {
         </Section>
       </Box>
 
+      {/* Full width below the charts: an odd number of items in the grid above
+          would leave an empty hole next to the awards table otherwise. */}
       <Section title="Recent Awards & Achievements">
         {awards.length === 0 ? (
           <EmptyState text="No awards recorded yet." />

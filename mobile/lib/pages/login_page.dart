@@ -192,9 +192,8 @@ class _LoginPageState extends State<LoginPage> {
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (v) => (v == null || v.length < 6)
-                          ? 'Password must be at least 6 characters'
-                          : null,
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Enter your password' : null,
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),

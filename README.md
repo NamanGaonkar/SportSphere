@@ -64,6 +64,7 @@ npm run build      # typecheck + production build
 export PATH="/c/Users/Naman Gaonkar/flutter/bin:$PATH"
 cd mobile
 flutter analyze
+python ../scripts/fix_env.py   # normalize .env to LF — CRLF breaks the dart-define values
 flutter build apk --release --target-platform android-arm64 \
   --dart-define=SUPABASE_URL="$(grep '^SUPABASE_URL=' ../.env | cut -d= -f2-)" \
   --dart-define=SUPABASE_ANON_KEY="$(grep '^SUPABASE_ANON_KEY=' ../.env | cut -d= -f2-)"
