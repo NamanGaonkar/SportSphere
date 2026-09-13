@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,7 +48,6 @@ class ColumnDef {
 
 // ---- shared sources (same tables as web modules.tsx) ----
 const sportSource = SourceDef('sports', 'id, name', 'name');
-const vendorSource = SourceDef('vendors', 'id, name', 'name');
 const teamSource = SourceDef('teams', 'id, name', 'name');
 const venueSource = SourceDef('venues', 'id, name', 'name');
 const coachSource = SourceDef('coaches', 'id, profile:profiles(full_name)', 'profile.full_name');
@@ -68,30 +66,6 @@ String _resolveLabel(String labelPath, DbRow r) {
 // ---- module definitions (1:1 with web/src/pages/modules.tsx) ----
 
 List<Widget Function()> modulePages() {
-  Widget purchases() => CrudList(
-        title: 'Vendor & Purchase Management',
-        sub: 'Purchase orders against vendors.',
-        table: 'purchase_orders',
-        columns: [
-          ColumnDef('vendor_id', 'Vendor', render: (r) => _srcText('vendors', r['vendor_id'])),
-          ColumnDef('items', 'Items', render: (r) {
-            final items = r['items'];
-            if (items is! List) return const Text('-');
-            return Text(items.map((i) => '${i['name']} x${i['qty']}').join(', '),
-                overflow: TextOverflow.ellipsis);
-          }),
-          ColumnDef('total', 'Total', render: (r) => Text(inr(_num(r['total'])))),
-          ColumnDef('status', 'Status',
-              render: (r) => BadgeChip((r['status'] ?? '-').toString(), color: statusColor(r['status']?.toString() ?? ''))),
-        ],
-        fields: const [
-          FieldDef('vendor_id', 'Vendor', type: FType.select, source: vendorSource),
-          FieldDef('status', 'Status', type: FType.select, options: ['Draft', 'Ordered', 'Received', 'Cancelled']),
-          FieldDef('total', 'Total (INR)', type: FType.number),
-          FieldDef('items', 'Items (JSON: [{"name","qty","price"}])', type: FType.textarea, fullWidth: true),
-        ],
-      );
-
   Widget housekeeping() => CrudList(
         title: 'Housekeeping Management',
         sub: 'Cleaning and upkeep tasks across venues.',
@@ -141,44 +115,61 @@ List<Widget Function()> modulePages() {
 
   Widget performance() => CrudList(
         title: 'Athlete Performance',
-        sub: 'Measured metrics: sprints, jumps, endurance and more.',
+        sub: 'Structured metric logging: sprints, jumps, endurance, gym and assessments.',
         table: 'performance_records',
+        orderBy: 'date',
         searchKeys: const ['metric', 'value'],
         columns: [
           ColumnDef('athlete_id', 'Athlete', render: (r) => _srcText('athletes', r['athlete_id'])),
           ColumnDef('date', 'Date', render: (r) => Text(fmtDate(r['date']?.toString()))),
-          ColumnDef('metric', 'Metric'),
-          ColumnDef('value', 'Value'),
-          ColumnDef('notes', 'Notes'),
+          ColumnDef('metric', 'Metric', render: (r) => Text('${r['metric'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w600))),
+          ColumnDef('value_num', 'Result', render: (r) => Text('${r['value_num'] ?? r['value'] ?? '-'} ${r['unit'] ?? ''}')),
+          ColumnDef('session_type', 'Session', render: (r) => BadgeChip('${r['session_type'] ?? 'Test'}', color: statusColor('Scheduled'))),
+          ColumnDef('coach_note', 'Coach note', render: (r) => Text('${r['coach_note'] ?? '-'}', overflow: TextOverflow.ellipsis)),
         ],
         fields: const [
           FieldDef('athlete_id', 'Athlete', type: FType.select, source: athleteSource, required: true),
           FieldDef('date', 'Date', type: FType.date),
-          FieldDef('metric', 'Metric', required: true),
-          FieldDef('value', 'Value', required: true),
-          FieldDef('notes', 'Notes', type: FType.textarea, fullWidth: true),
+          FieldDef('metric', 'Metric (e.g. 100m Sprint)', required: true),
+          FieldDef('value', 'Result (display)', required: true),
+          FieldDef('value_num', 'Numeric value', type: FType.number),
+          FieldDef('unit', 'Unit (sec / cm / kg / reps)'),
+          FieldDef('session_type', 'Session type', type: FType.select, options: ['Test', 'Assessment', 'Gym', 'Competition']),
+          FieldDef('coach_note', 'Coach note', type: FType.textarea, fullWidth: true),
         ],
       );
 
   Widget medical() => CrudList(
         title: 'Athlete Medical',
-        sub: 'Checkups, injuries, physio and clearances.',
+        sub: 'Detailed logging: vitals, injuries, severity, treatment and follow-ups.',
         table: 'medical_records',
+        orderBy: 'date',
         searchKeys: const ['details'],
         columns: [
           ColumnDef('athlete_id', 'Athlete', render: (r) => _srcText('athletes', r['athlete_id'])),
-          ColumnDef('type', 'Type'),
+          ColumnDef('type', 'Type', render: (r) => BadgeChip('${r['type'] ?? '-'}',
+              color: r['type'] == 'Injury' ? const Color(0xFFC62828) : r['type'] == 'Physio' ? const Color(0xFFB26A00) : const Color(0xFF1565C0))),
           ColumnDef('details', 'Details'),
+          ColumnDef('severity', 'Severity', render: (r) {
+            final s = '${r['severity'] ?? 'None'}';
+            return s == 'None' ? const Text('-') : BadgeChip(s, color: s == 'Severe' ? const Color(0xFFC62828) : s == 'Moderate' ? const Color(0xFFB26A00) : const Color(0xFF1565C0));
+          }),
           ColumnDef('cleared', 'Cleared', render: (r) => BadgeChip(
               r['cleared'] == true ? 'Cleared' : 'Not cleared',
               color: r['cleared'] == true ? const Color(0xFF2E7D32) : const Color(0xFFC62828))),
+          ColumnDef('follow_up_date', 'Follow-up', render: (r) => Text(fmtDate(r['follow_up_date']?.toString()))),
           ColumnDef('date', 'Date', render: (r) => Text(fmtDate(r['date']?.toString()))),
         ],
         fields: const [
           FieldDef('athlete_id', 'Athlete', type: FType.select, source: athleteSource, required: true),
           FieldDef('date', 'Date', type: FType.date),
           FieldDef('type', 'Type', type: FType.select, options: ['Checkup', 'Injury', 'Physio', 'Clearance']),
+          FieldDef('height_cm', 'Height (cm)', type: FType.number),
+          FieldDef('weight_kg', 'Weight (kg)', type: FType.number),
+          FieldDef('severity', 'Severity', type: FType.select, options: ['None', 'Mild', 'Moderate', 'Severe']),
           FieldDef('cleared', 'Cleared to play', type: FType.checkbox),
+          FieldDef('treatment', 'Treatment', fullWidth: true),
+          FieldDef('follow_up_date', 'Follow-up date', type: FType.date),
           FieldDef('details', 'Details', type: FType.textarea, required: true, fullWidth: true),
         ],
       );
@@ -295,7 +286,6 @@ List<Widget Function()> modulePages() {
       );
 
   return [
-    purchases,
     housekeeping,
     training,
     performance,
@@ -344,6 +334,7 @@ class CrudList extends StatefulWidget {
   final String title;
   final String sub;
   final String table;
+  final String orderBy;
   final List<ColumnDef> columns;
   final List<FieldDef> fields;
   final List<String> searchKeys;
@@ -354,6 +345,7 @@ class CrudList extends StatefulWidget {
     required this.table,
     required this.columns,
     required this.fields,
+    this.orderBy = 'created_at',
     this.searchKeys = const [],
   });
 
@@ -384,7 +376,7 @@ class _CrudListState extends State<CrudList> {
 
   Future<void> _load() async {
     try {
-      final data = await client.from(widget.table).select('*').order('created_at', ascending: false);
+      final data = await client.from(widget.table).select('*').order(widget.orderBy, ascending: false);
       if (!mounted) return;
       setState(() {
         _rows = (data as List).cast<DbRow>();
@@ -527,8 +519,6 @@ class _CrudListState extends State<CrudList> {
         form[f.key] = v?.toString() ?? '';
       } else if (f.type == FType.date) {
         form[f.key] = (v?.toString() ?? '').split('T').first;
-      } else if (f.type == FType.textarea && f.key == 'items') {
-        form[f.key] = v == null ? '[]' : (v is String ? v : v.toString());
       } else {
         form[f.key] = v?.toString() ?? '';
       }
@@ -609,14 +599,6 @@ class _CrudFormState extends State<_CrudForm> {
       }
       if (f.type == FType.checkbox) v = v == true;
       if (f.type == FType.select && v == '') v = null;
-      if (f.key == 'items' && v is String) {
-        try {
-          v = (v.trim().isEmpty) ? <dynamic>[] : await Future.value(_parseJson(v));
-        } catch (_) {
-          setState(() => _error = 'Items must be valid JSON');
-          return;
-        }
-      }
       if (v == '') v = null;
       payload[f.key] = v;
     }
@@ -632,8 +614,6 @@ class _CrudFormState extends State<_CrudForm> {
       setState(() => _error = '$e');
     }
   }
-
-  dynamic _parseJson(String s) => jsonDecode(s);
 
   @override
   Widget build(BuildContext context) {

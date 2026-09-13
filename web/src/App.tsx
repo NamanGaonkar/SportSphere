@@ -27,6 +27,7 @@ import {
   School as ActivitiesIcon, Event as EventsIcon,
   DirectionsBus as TransportIcon, Hotel as AccommodationIcon,
   Speed as PerformanceIcon, MedicalServices as MedicalIcon,
+  ManageAccounts as ManageAccountsIcon,
 } from '@mui/icons-material'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
@@ -43,9 +44,11 @@ import Staff from './pages/Staff'
 import Inventory from './pages/Inventory'
 import Reports from './pages/Reports'
 import {
-  Purchases, Housekeeping, Training, Performance, Medical,
+  Housekeeping, Training, Performance, Medical,
   EventsPage, Transport, Accommodation, Expenses, Activities,
 } from './pages/modules'
+import Purchases from './pages/Purchases'
+import Users from './pages/Users'
 
 export type Profile = {
   id: string
@@ -79,6 +82,7 @@ const NAV_SECTIONS: {
       { to: '/coaches', label: 'Coaches', icon: CoachesIcon },
       { to: '/teams', label: 'Teams', icon: TeamsIcon },
       { to: '/staff', label: 'Staff & HR', icon: StaffIcon },
+      { to: '/users', label: 'User Management', icon: ManageAccountsIcon, roles: ['Admin'] },
     ],
   },
   {
@@ -367,6 +371,8 @@ export default function App() {
             <Route path="/sports" element={<Sports />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/users" element={<Users />} />
             <Route path="/housekeeping" element={<Housekeeping />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/expenses" element={<Expenses />} />

@@ -322,6 +322,104 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
   }
 }
 
+/// Donut pie — web Reports.tsx parity (recharts PieChart with innerRadius).
+/// Colors match the web CHART_COLORS order.
+const pieColors = [
+  Color(0xFFFF6A13), // primary orange
+  Color(0xFF2E7D32), // success
+  Color(0xFFB26A00), // warning
+  Color(0xFFC62828), // error
+  Color(0xFF1565C0), // info
+  Color(0xFF757575), // muted
+];
+
+class DonutPie extends StatelessWidget {
+  final List<MapEntry<String, num>> entries;
+  const DonutPie(this.entries, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return const EmptyState('No data yet.');
+    final total = entries.fold<num>(0, (s, e) => s + e.value);
+    return Column(
+      children: [
+        SizedBox(
+          height: 160,
+          width: 160,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 160,
+                height: 160,
+                child: CustomPaint(
+                  painter: _DonutPainter(
+                    segments: [
+                      for (var i = 0; i < entries.length; i++)
+                        MapEntry(entries[i].value / (total == 0 ? 1 : total), pieColors[i % pieColors.length]),
+                    ],
+                  ),
+                ),
+              ),
+              Text('$total',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 14,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
+          children: [
+            for (var i = 0; i < entries.length; i++)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: pieColors[i % pieColors.length],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text('${entries[i].key} (${entries[i].value})',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black87)),
+                ],
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  final List<MapEntry<double, Color>> segments;
+  const _DonutPainter({required this.segments});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final inner = radius * 0.62;
+    final paint = Paint()..style = PaintingStyle.stroke;
+    var start = -1.5708; // top
+    for (final seg in segments) {
+      final sweep = seg.key * 6.28318;
+      paint.color = seg.value;
+      paint.strokeWidth = radius - inner;
+      canvas.drawArc(Rect.fromCircle(center: center, radius: (radius + inner) / 2), start, sweep == 0 ? 0.0001 : sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) => oldDelegate.segments != segments;
+}
+
 /// Horizontal percentage bars — used for "Teams by sport" and Reports.
 class HBars extends StatelessWidget {
   final List<MapEntry<String, num>> entries;

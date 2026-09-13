@@ -1,10 +1,10 @@
 import CrudPage from '../components/CrudPage'
 import type { ColumnDef, FieldDef } from '../components/CrudPage'
+import Box from '@mui/material/Box'
 import { Badge, statusColor } from '../components/ui'
 import { useSportNameMap } from '../components/SportSelect'
 
 const sportSource = { table: 'sports', select: 'id, name', labelPath: 'name' }
-const vendorSource = { table: 'vendors', select: 'id, name', labelPath: 'name' }
 const teamSource = { table: 'teams', select: 'id, name', labelPath: 'name' }
 const venueSource = { table: 'venues', select: 'id, name', labelPath: 'name' }
 const coachSource = { table: 'coaches', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
@@ -21,25 +21,6 @@ const moneyCol = (key: string, label: string): ColumnDef => ({
   label,
   render: (row) => (row[key] == null ? '-' : `Rs ${Number(row[key]).toLocaleString('en-IN')}`),
 })
-
-export function Purchases() {
-  const fields: FieldDef[] = [
-    { key: 'vendor_id', label: 'Vendor', type: 'select', source: vendorSource },
-    { key: 'status', label: 'Status', type: 'select', options: ['Draft', 'Ordered', 'Received', 'Cancelled'] },
-    { key: 'total', label: 'Total (INR)', type: 'number' },
-    { key: 'items', label: 'Items (JSON: [{"name","qty","price"}])', type: 'textarea', fullWidth: true },
-  ]
-  const columns: ColumnDef[] = [
-    { key: 'vendor_id', label: 'Vendor' },
-    { key: 'items', label: 'Items', render: (r) => {
-        const items = Array.isArray(r.items) ? r.items as { name: string; qty: number }[] : []
-        return items.map((i) => `${i.name} x${i.qty}`).join(', ') || '-'
-      } },
-    moneyCol('total', 'Total'),
-    statusCol('status', 'Status'),
-  ]
-  return <CrudPage title="Vendor & Purchase Management" sub="Purchase orders against vendors." table="purchase_orders" columns={columns} fields={fields} />
-}
 
 export function Housekeeping() {
   const fields: FieldDef[] = [
@@ -86,18 +67,22 @@ export function Performance() {
   const fields: FieldDef[] = [
     { key: 'athlete_id', label: 'Athlete', type: 'select', source: athleteSource, required: true },
     { key: 'date', label: 'Date', type: 'date' },
-    { key: 'metric', label: 'Metric', required: true },
-    { key: 'value', label: 'Value', required: true },
-    { key: 'notes', label: 'Notes', type: 'textarea', fullWidth: true },
+    { key: 'metric', label: 'Metric (e.g. 100m Sprint)', required: true },
+    { key: 'value', label: 'Result (display)', required: true },
+    { key: 'value_num', label: 'Numeric value', type: 'number' },
+    { key: 'unit', label: 'Unit (sec / cm / kg / reps)' },
+    { key: 'session_type', label: 'Session type', type: 'select', options: ['Test', 'Assessment', 'Gym', 'Competition'] },
+    { key: 'coach_note', label: 'Coach note', type: 'textarea', fullWidth: true },
   ]
   const columns: ColumnDef[] = [
     { key: 'athlete_id', label: 'Athlete' },
     { key: 'date', label: 'Date' },
-    { key: 'metric', label: 'Metric' },
-    { key: 'value', label: 'Value' },
-    { key: 'notes', label: 'Notes' },
+    { key: 'metric', label: 'Metric', render: (r) => <Box component="span" sx={{ fontWeight: 600 }}>{String(r.metric ?? '-')}</Box> },
+    { key: 'value_num', label: 'Result', render: (r) => `${r.value_num ?? r.value ?? '-'} ${r.unit ?? ''}` },
+    { key: 'session_type', label: 'Session', render: (r) => <Badge color={r.session_type === 'Competition' ? 'info' : 'default'}>{String(r.session_type ?? 'Test')}</Badge> },
+    { key: 'coach_note', label: 'Coach note' },
   ]
-  return <CrudPage title="Athlete Performance" sub="Measured metrics: sprints, jumps, endurance and more." table="performance_records" columns={columns} fields={fields} searchKeys={['metric', 'value']} />
+  return <CrudPage title="Athlete Performance" sub="Structured metric logging: sprints, jumps, endurance, gym and assessments." table="performance_records" orderBy="date" columns={columns} fields={fields} searchKeys={['metric', 'value']} />
 }
 
 export function Medical() {
@@ -105,17 +90,24 @@ export function Medical() {
     { key: 'athlete_id', label: 'Athlete', type: 'select', source: athleteSource, required: true },
     { key: 'date', label: 'Date', type: 'date' },
     { key: 'type', label: 'Type', type: 'select', options: ['Checkup', 'Injury', 'Physio', 'Clearance'] },
+    { key: 'height_cm', label: 'Height (cm)', type: 'number' },
+    { key: 'weight_kg', label: 'Weight (kg)', type: 'number' },
+    { key: 'severity', label: 'Severity', type: 'select', options: ['None', 'Mild', 'Moderate', 'Severe'] },
     { key: 'cleared', label: 'Cleared to play', type: 'checkbox' },
+    { key: 'treatment', label: 'Treatment', fullWidth: true },
+    { key: 'follow_up_date', label: 'Follow-up date', type: 'date' },
     { key: 'details', label: 'Details', type: 'textarea', required: true, fullWidth: true },
   ]
   const columns: ColumnDef[] = [
     { key: 'athlete_id', label: 'Athlete' },
-    { key: 'type', label: 'Type' },
+    { key: 'type', label: 'Type', render: (r) => <Badge color={r.type === 'Injury' ? 'error' : r.type === 'Physio' ? 'warning' : 'info'}>{String(r.type ?? '-')}</Badge> },
     { key: 'details', label: 'Details' },
+    { key: 'severity', label: 'Severity', render: (r) => (r.severity && r.severity !== 'None' ? <Badge color={r.severity === 'Severe' ? 'error' : r.severity === 'Moderate' ? 'warning' : 'info'}>{String(r.severity)}</Badge> : '-') },
     { key: 'cleared', label: 'Cleared', render: (r) => <Badge color={r.cleared ? 'success' : 'error'}>{r.cleared ? 'Cleared' : 'Not cleared'}</Badge> },
+    { key: 'follow_up_date', label: 'Follow-up', render: (r) => (r.follow_up_date ? new Date(String(r.follow_up_date) + 'T00:00:00').toLocaleDateString() : '-') },
     { key: 'date', label: 'Date' },
   ]
-  return <CrudPage title="Athlete Medical" sub="Checkups, injuries, physio and clearances." table="medical_records" columns={columns} fields={fields} searchKeys={['details']} />
+  return <CrudPage title="Athlete Medical" sub="Detailed logging: vitals, injuries, severity, treatment and follow-ups." table="medical_records" orderBy="date" columns={columns} fields={fields} searchKeys={['details']} />
 }
 
 export function EventsPage() {

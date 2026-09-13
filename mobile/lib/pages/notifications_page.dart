@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/sports.dart' show listen;
+
+/// Alerts / notification center — realtime: new notifications appear the
+/// moment they are inserted from web or mobile (no pull-to-refresh needed).
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -11,31 +15,45 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   bool _loading = true;
   List<Map<String, dynamic>> _items = [];
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Realtime: the notifications table is in the supabase_realtime
+    // publication, so any insert from the web app lands here instantly.
+    _channel = listen('notifications', _load);
+  }
+
+  @override
+  void dispose() {
+    if (_channel != null) Supabase.instance.client.removeChannel(_channel!);
+    super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
     final client = Supabase.instance.client;
     final uid = client.auth.currentUser?.id;
     if (uid == null) return;
 
-    final data = await client
-        .from('notifications')
-        .select('id, message, read, created_at')
-        .eq('recipient_id', uid)
-        .order('created_at', ascending: false)
-        .limit(30);
+    try {
+      final data = await client
+          .from('notifications')
+          .select('id, message, read, created_at')
+          .eq('recipient_id', uid)
+          .order('created_at', ascending: false)
+          .limit(50);
 
-    if (!mounted) return;
-    setState(() {
-      _items = (data as List).cast<Map<String, dynamic>>();
-      _loading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _items = (data as List).cast<Map<String, dynamic>>();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _markAllRead() async {
@@ -91,40 +109,46 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final read = n['read'] == true;
                         final created = DateTime.tryParse(n['created_at'].toString())?.toLocal();
                         return Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  read ? Icons.notifications_none : Icons.notifications_active,
-                                  size: 20,
-                                  color: read ? Colors.black26 : const Color(0xFFFF6A13),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        n['message'].toString(),
-                                        style: TextStyle(
-                                            fontSize: 13.5,
-                                            color: read ? Colors.black45 : Colors.black),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        created != null
-                                            ? "${created.day}/${created.month} - ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}"
-                                            : '',
-                                        style: TextStyle(
-                                            fontSize: 11, color: Colors.black.withValues(alpha: 0.35)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          child: ListTile(
+                            onTap: read
+                                ? null
+                                : () async {
+                                    await Supabase.instance.client
+                                        .from('notifications')
+                                        .update({'read': true})
+                                        .eq('id', n['id']);
+                                    _load();
+                                  },
+                            leading: Icon(
+                              read ? Icons.notifications_none : Icons.notifications_active,
+                              size: 22,
+                              color: read ? Colors.black26 : const Color(0xFFFF6A13),
                             ),
+                            title: Text(
+                              n['message'].toString(),
+                              style: TextStyle(
+                                  fontSize: 13.5, color: read ? Colors.black45 : Colors.black),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                created != null
+                                    ? "${created.day}/${created.month} - ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}"
+                                    : '',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.black.withValues(alpha: 0.35)),
+                              ),
+                            ),
+                            trailing: read
+                                ? null
+                                : Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFF6A13),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
                           ),
                         );
                       },

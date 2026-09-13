@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { SxProps, Theme } from '@mui/material/styles'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Paper from '@mui/material/Paper'
@@ -50,9 +51,9 @@ export function StatCard({ label, value, sub }: { label: string; value: ReactNod
   )
 }
 
-export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+export function Section({ title, action, children, sx }: { title: string; action?: ReactNode; children: ReactNode; sx?: SxProps<Theme> }) {
   return (
-    <Paper sx={{ p: 2.5, mb: 2 }}>
+    <Paper sx={[{ p: 2.5, mb: 2 }, ...(Array.isArray(sx) ? sx : [sx])] as SxProps<Theme>}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, gap: 1 }}>
         <Typography variant="h6">{title}</Typography>
         {action}

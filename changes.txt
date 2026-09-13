@@ -52,3 +52,67 @@ Mobile: onboarding FIXED — only the background images cross-fade now; Sign in 
 ✅ All 21 modules — now in the web app
 
 Athlete · Coach · Staff & HR · Attendance & Leave · Payroll (view) · Venues · Housekeeping · Inventory · Vendors & Purchases · Tournaments (School/District/State/National) · Teams & Players · Fixtures/Matches/Results · School Activities · Training & Camps · Performance & Medical · Awards · Events · Transport · Accommodation · Finance & Expenses · Reports & Dashboard + role-based access (Admin sees all, Athlete sees their own data via RLS).
+
+
+
+couple of changes which  i need in the webapp and the app which is 
+1.recent rewards and maagement that part that table looks dulla nd not in proper layout like so fix that 
+it should be in proper layout (same goes for the phone)
+2.make sure all users u have enterd are seededlike i can still see data is not seeded properly erxample team by sport dahbaord 
+3. latest payroll card isthere on phone and misisng on webapp dahbaord fix that and its layoout s missing  on the phone Dashboard
+4. report section the main dahboard in webapp has piew charts but u did bar charts in mobile apps o fix that asap i need exact cut copy and data 
+should be in real time thats a very important part
+5. cant add o r do anything in both app and webapp shows some exception error in phone and in th ew eb app to like so fix that to like 
+6.staff and hr and profile section for mobile app is misisng 
+7.attendence and leave section is brken and incqurae ont he phone so fix that to.
+8. inventory and equipement reqap it fully on app and webapp and add a indetailed way of manging equipeemnt make sure that is 
+showen in the dahboard to like both phone and webapp
+9.same liek inventory vendor and purchances should be linked together and a new way og loggint hem should be done 
+and i cant see anyhting related to them on the phone and webapp so a new system u will do make sure the dat ais tehre on phone
+as now ic ant see anything.
+10. same in traning and camps i cants ee anythign andphone 
+11. same in school sports activites cant see them 
+12. same in events cant see on phone ,ake sure theese are seeded properly like the webapp and there data shoul dmatch
+13.same for transprot no dta is u know there in ap from the web app so fix that
+14. same for accomodation fix that cants ee on phone
+15. athetle perfomace a new detailed system both for android app and webapp also i cants e ethe data on phoen blank fic that
+16. same for medical all data hsould be on dhabord to should eb showen and on phoen and web app new detaield logging method should be introduced 
+and fix empty data onphone
+17 . a new profile section for phone also iw ant 
+18. make sure the changes are there on thr db level  like all fields all button all datta entry should work in both appa nd phone 
+19. alerts sections buffer and doesnt work on phone takes times
+
+
+make sure per user data and all that flow is maiantan across all users
+make role based system for admina dmin can manage the users both froma pp and webappd o all tehse chnages 
+
+
+
+All 19 points are done — web at http://localhost:5173 (already running), new 22.8MB APK installed and verified crash-free on your phone. Here's the full list:
+
+The root cause of #5 (couldn't add anything anywhere)
+
+Your admin login had role Athlete and the Venue Manager login had role Admin (a trigger swap from earlier). So every admin write failed RLS on both apps. Fixed, plus a new  protect_admin_row  trigger so only admins can touch the admin account. Verified: 26/26 tables now accept admin writes (audit script:  scripts/audit_inserts.py ).
+
+Seeding (#2, #10–#14, #16)
+
+Every module is now populated and wired to the six login users: 16 teams across all 10 sports, 6 tournaments (all levels), 20 matches (finished/live/upcoming), 12 coaches' teams, 810 attendance rows (30 days for everyone), 6 months payroll × 3 staff, 26 inventory items + movement history, 9 vendors, 8 POs with line items, 13 awards, 41 structured performance records, 75 detailed medical records, 12 housekeeping tasks, 13 training sessions/camps, 8 events, 8 transport runs, 5 hotel bookings, 17 expenses, 9 school activities, notifications for all six users.
+
+New systems
+
+- #8 Inventory & Equipment (both apps): full item management — category, location, unit, min stock, unit cost, condition, assigned team — plus a Stock movements tab (IN / OUT / MAINTENANCE / ADJUST) via a secure DB RPC, stat cards, low-stock panel. Equipment Watchlist is on the dashboard of both apps.
+- #9 Vendors & Purchases (both apps): one connected system — POs with real line items linked to inventory; marking an order Received auto-stocks the items and books the expense (DB trigger). Tabs: Orders / Line items / Vendors.
+- #15/#16 Performance & Medical (both apps): structured metrics (numeric value, unit, session type, coach note) and detailed medical logging (height, weight, severity, treatment, follow-up date). Medical Watchlist on both dashboards.
+- #19 Role-based admin — new User Management page on web and phone (Admin-only nav item): rename users, edit contacts, change roles via security-definer RPCs, synced live across platforms.
+
+Layout & parity fixes
+
+- #1 Awards section is now a proper table (Athlete | Award | Level badge | Date) on web dashboard and phone.
+- #3 Latest Payroll card added to the web dashboard; payroll card layout fixed on phone.
+- #4 Phone Reports now use the same donut pie charts as web (same data, same colors) — realtime.
+- #6 Staff & HR and Profile are in the phone's sidebar (People section); profile page shows your record, role, and awards.
+- #7 Attendance on phone: Leave requires a reason dialog, instant saves, status badges, realtime.
+- #18 Every field/button works on both — all writes go through the same fixed RLS.
+- Alerts (#19): realtime subscription — new alerts appear instantly, unread dots, tap to mark read, plus a DB index so loading is instant.
+
+Verified:  tsc  clean ·  vite build  clean ·  flutter analyze  0 issues · admin insert audit passes · app launches and runs with zero  FATAL EXCEPTION s.

@@ -11,11 +11,13 @@ import 'crud_page.dart';
 import 'notifications_page.dart';
 import 'inventory_page.dart';
 import 'matches_admin_page.dart';
+import 'purchases_page.dart';
 import 'reports_page.dart';
 import 'splash_page.dart';
 import 'staff_admin_page.dart';
 import 'teams_page.dart';
 import 'tournaments_page.dart';
+import 'users_page.dart';
 import 'venues_admin_page.dart';
 
 /// Navigation is 1:1 with web App.tsx NAV_SECTIONS — same sections, same
@@ -44,6 +46,7 @@ const _navSections = <_NavSection>[
     _NavItem('Coaches', Icons.sports_outlined, _coaches),
     _NavItem('Teams', Icons.shield_outlined, _teams),
     _NavItem('Staff & HR', Icons.badge_outlined, _staff, roles: ['Admin', 'HR']),
+    _NavItem('User Management', Icons.manage_accounts_outlined, _users, roles: ['Admin']),
   ]),
   _NavSection('Competitions', [
     _NavItem('Tournaments', Icons.emoji_events_outlined, _tournaments),
@@ -77,21 +80,22 @@ Widget _athletes() => const AthletesPage();
 Widget _coaches() => const CoachesPage();
 Widget _teams() => const TeamsPage();
 Widget _staff() => const StaffAdminPage();
+Widget _users() => const UsersPage();
 Widget _tournaments() => const TournamentsPage();
 Widget _matches() => const MatchesAdminPage();
 Widget _venues() => const VenuesAdminPage();
 Widget _attendance() => const AttendanceAdminPage();
 Widget _inventory() => const InventoryPage();
-Widget _housekeeping() => modulePages()[1]();
-Widget _purchases() => modulePages()[0]();
-Widget _expenses() => modulePages()[8]();
-Widget _training() => modulePages()[2]();
-Widget _activities() => modulePages()[9]();
-Widget _events() => modulePages()[5]();
-Widget _transport() => modulePages()[6]();
-Widget _accommodation() => modulePages()[7]();
-Widget _performance() => modulePages()[3]();
-Widget _medical() => modulePages()[4]();
+Widget _housekeeping() => modulePages()[0]();
+Widget _purchases() => const PurchasesPage();
+Widget _expenses() => modulePages()[7]();
+Widget _training() => modulePages()[1]();
+Widget _activities() => modulePages()[8]();
+Widget _events() => modulePages()[4]();
+Widget _transport() => modulePages()[5]();
+Widget _accommodation() => modulePages()[6]();
+Widget _performance() => modulePages()[2]();
+Widget _medical() => modulePages()[3]();
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -350,12 +354,18 @@ class _DashboardHomeState extends State<DashboardHome> {
   List<({String day, num pct})> _attendance = [];
   List<DbRow> _payroll = [];
   List<DbRow> _awards = [];
+  List<DbRow> _equip = [];
+  List<DbRow> _med = [];
+  int _pendingPO = 0;
   String _name = '';
   String _role = '';
   RealtimeChannel? _cTeams;
   RealtimeChannel? _cMatches;
   RealtimeChannel? _cAtt;
   RealtimeChannel? _cSports;
+  RealtimeChannel? _cInv;
+  RealtimeChannel? _cPO;
+  RealtimeChannel? _cMed;
 
   @override
   void initState() {
@@ -365,11 +375,14 @@ class _DashboardHomeState extends State<DashboardHome> {
     _cMatches = listen('matches', _load);
     _cAtt = listen('attendance', _load);
     _cSports = listen('sports', _load);
+    _cInv = listen('inventory_items', _load);
+    _cPO = listen('purchase_orders', _load);
+    _cMed = listen('medical_records', _load);
   }
 
   @override
   void dispose() {
-    for (final c in [_cTeams, _cMatches, _cAtt, _cSports]) {
+    for (final c in [_cTeams, _cMatches, _cAtt, _cSports, _cInv, _cPO, _cMed]) {
       if (c != null) Supabase.instance.client.removeChannel(c);
     }
     super.dispose();
@@ -404,6 +417,13 @@ class _DashboardHomeState extends State<DashboardHome> {
             .select('id, title, level, date, athletes(profile:profiles(full_name))')
             .order('date', ascending: false)
             .limit(6),
+        c.from('inventory_items').select('id, name, quantity, min_stock, condition'),
+        c.from('purchase_orders').select('id, status'),
+        c
+            .from('medical_records')
+            .select('id, athlete_id, type, cleared, date, athletes(profile:profiles(full_name))')
+            .order('date', ascending: false)
+            .limit(8),
       ]);
       if (!mounted) return;
 
@@ -437,6 +457,12 @@ class _DashboardHomeState extends State<DashboardHome> {
         _role = '${profile?['role'] ?? ''}';
         _payroll = (results[7] as List).cast<DbRow>();
         _awards = (results[8] as List).cast<DbRow>();
+        _equip = (results[9] as List).cast<DbRow>();
+        _pendingPO = (results[10] as List)
+            .cast<DbRow>()
+            .where((r) => r['status'] == 'Ordered')
+            .length;
+        _med = (results[11] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {
@@ -575,34 +601,135 @@ class _DashboardHomeState extends State<DashboardHome> {
                 ? const EmptyState('No awards recorded yet.')
                 : Column(
                     children: [
+                      const Row(children: [
+                        Expanded(flex: 3, child: Text('ATHLETE', style: dashHeadStyle)),
+                        Expanded(flex: 4, child: Text('AWARD', style: dashHeadStyle)),
+                        Expanded(flex: 2, child: Text('LEVEL', style: dashHeadStyle)),
+                        Expanded(flex: 2, child: Text('DATE', style: dashHeadStyle)),
+                      ]),
+                      const SizedBox(height: 6),
                       for (final a in _awards)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 5),
                           child: Row(
                             children: [
                               Expanded(
+                                flex: 3,
                                 child: Text(
                                     ((((a['athletes'] ?? {}) as Map)['profile'] ?? {})['full_name'] ?? '-').toString(),
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13)),
+                                    style: const TextStyle(fontSize: 12.5)),
+                              ),
+                              Expanded(
+                                flex: 4,
+                                child: Text('${a['title']}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                               ),
                               Expanded(
                                 flex: 2,
-                                child: Text('${a['title']}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                child: BadgeChip('${a['level'] ?? '-'}',
+                                    color: levelColor('${a['level'] ?? ''}')),
                               ),
-                              Text(a['level']?.toString() ?? '-',
-                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              Expanded(
+                                flex: 2,
+                                child: Text(fmtDate(a['date']?.toString()),
+                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                              ),
                             ],
                           ),
                         ),
                     ],
                   ),
           ),
+          const SizedBox(height: 16),
+          _Card(
+            title: 'Equipment Watchlist',
+            child: _equip.isEmpty
+                ? const EmptyState('No inventory items yet.')
+                : Column(
+                    children: [
+                      for (final e in _lowestStock)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(child: Text('${e['name']}', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
+                              Text('${e['quantity'] ?? 0} left', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                              const SizedBox(width: 8),
+                              BadgeChip(
+                                ((e['quantity'] ?? 0) as num) <= ((e['min_stock'] ?? 0) as num? ?? 0)
+                                    ? 'Low'
+                                    : '${e['condition'] ?? '-'}',
+                                color: ((e['quantity'] ?? 0) as num) <= ((e['min_stock'] ?? 0) as num? ?? 0)
+                                    ? const Color(0xFFB26A00)
+                                    : const Color(0xFF2E7D32),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            title: 'Medical Watchlist',
+            child: _med.isEmpty
+                ? const EmptyState('No medical records yet.')
+                : Column(
+                    children: [
+                      for (final m in _med)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                    ((((m['athletes'] ?? {}) as Map)['profile'] ?? {})['full_name'] ?? '-').toString(),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13)),
+                              ),
+                              Text('${m['type'] ?? '-'}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              const SizedBox(width: 8),
+                              BadgeChip(
+                                m['cleared'] == true ? 'Cleared' : 'Not cleared',
+                                color: m['cleared'] == true ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            title: 'Procurement',
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('$_pendingPO', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Brand.primary)),
+                    const Text('POs awaiting delivery', style: TextStyle(fontSize: 11.5, color: Colors.black54)),
+                  ]),
+                ),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${_equip.length}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                    const Text('Equipment items tracked', style: TextStyle(fontSize: 11.5, color: Colors.black54)),
+                  ]),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  List<DbRow> get _lowestStock {
+    final sorted = [..._equip];
+    sorted.sort((a, b) => ((a['quantity'] ?? 0) as num).compareTo((b['quantity'] ?? 0) as num));
+    return sorted.take(6).toList();
   }
 
   num? _toNum(dynamic v) => v is num ? v : num.tryParse('${v ?? ''}');

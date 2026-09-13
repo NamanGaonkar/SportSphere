@@ -7,8 +7,8 @@ import 'crud_page.dart' show DbRow;
 
 final client = Supabase.instance.client;
 
-/// Mobile mirror of web/src/pages/Reports.tsx — same datasets: athletes by
-/// sport, teams by sport, 30-day attendance rate, recent awards.
+/// Mobile mirror of web/src/pages/Reports.tsx — same datasets, same pie
+/// charts (donuts with legend), same 30-day attendance bars, awards table.
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
 
@@ -18,8 +18,8 @@ class ReportsPage extends StatefulWidget {
 
 class _ReportsPageState extends State<ReportsPage> {
   bool _loading = true;
-  Map<String, int> _athleteSports = {};
-  Map<String, int> _teamSports = {};
+  List<MapEntry<String, int>> _athleteSports = [];
+  List<MapEntry<String, int>> _teamSports = [];
   List<({String day, num pct})> _attendance = [];
   List<DbRow> _awards = [];
   RealtimeChannel? _c1;
@@ -79,8 +79,8 @@ class _ReportsPageState extends State<ReportsPage> {
       final days = byDay.keys.toList()..sort();
 
       setState(() {
-        _athleteSports = am;
-        _teamSports = tm;
+        _athleteSports = am.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+        _teamSports = tm.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _attendance = [
           for (final d in days)
             (
@@ -110,12 +110,12 @@ class _ReportsPageState extends State<ReportsPage> {
               sub: 'Organization analytics - rosters, attendance and achievements.'),
           SectionCard(
             title: 'Athletes by Sport',
-            child: HBars(_athleteSports.entries.map((e) => MapEntry(e.key, e.value)).toList()),
+            child: DonutPie(_athleteSports),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Teams by Sport',
-            child: HBars(_teamSports.entries.map((e) => MapEntry(e.key, e.value)).toList()),
+            child: DonutPie(_teamSports),
           ),
           const SizedBox(height: 16),
           SectionCard(
@@ -129,28 +129,52 @@ class _ReportsPageState extends State<ReportsPage> {
                 ? const EmptyState('No awards recorded yet.')
                 : Column(
                     children: [
+                      // header row — proper table layout
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F0),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          children: [
+                            Expanded(flex: 3, child: Text('ATHLETE', style: _headStyle)),
+                            Expanded(flex: 4, child: Text('AWARD', style: _headStyle)),
+                            Expanded(flex: 2, child: Text('LEVEL', style: _headStyle)),
+                            Expanded(flex: 2, child: Text('DATE', style: _headStyle)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       for (final a in _awards)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                           child: Row(
                             children: [
                               Expanded(
+                                flex: 3,
                                 child: Text(
                                     ((((a['athletes'] ?? {}) as Map)['profile'] ?? {})['full_name'] ?? '-')
                                         .toString(),
-                                    style: const TextStyle(fontSize: 13)),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12.5)),
+                              ),
+                              Expanded(
+                                flex: 4,
+                                child: Text('${a['title']}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                               ),
                               Expanded(
                                 flex: 2,
-                                child: Text('${a['title']}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                child: BadgeChip('${a['level'] ?? '-'}',
+                                    color: levelColor('${a['level'] ?? ''}')),
                               ),
-                              Text('${a['level'] ?? '-'}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                              const SizedBox(width: 8),
-                              Text(fmtDate(a['date']?.toString()),
-                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              Expanded(
+                                flex: 2,
+                                child: Text(fmtDate(a['date']?.toString()),
+                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                              ),
                             ],
                           ),
                         ),
@@ -162,3 +186,10 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 }
+
+const _headStyle = TextStyle(
+    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.black54);
+
+/// Shared dashboard/reports table header style.
+const dashHeadStyle = TextStyle(
+    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.black54);

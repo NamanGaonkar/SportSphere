@@ -9,8 +9,11 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
+import Tooltip from '@mui/material/Tooltip'
+import Typography from '@mui/material/Typography'
+import LinearProgress from '@mui/material/LinearProgress'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { palette } from '../theme'
 
@@ -25,19 +28,42 @@ type MatchRow = {
   team_b: { name: string } | null
   tournaments: { name: string } | null
 }
+type PayrollRow = {
+  id: string
+  month: string
+  net: number | null
+  staff: { profile: { full_name: string } | null } | null
+}
+type AwardRow = {
+  id: string
+  title: string
+  date: string | null
+  level: string | null
+  athletes: { profile: { full_name: string } | null } | null
+}
+type EquipRow = { id: string; name: string; quantity: number | null; min_stock: number | null; condition: string | null }
+type MedRow = { id: string; athlete_id: string; type: string; cleared: boolean; date: string; athletes: { profile: { full_name: string } | null } | null }
 
-// Dashboard metrics are shared with the mobile app (same stats, same order).
+// Dashboard metrics are shared with the mobile app (same stats, same order,
+// same sections — parity is intentional and enforced on both sides).
 export default function Dashboard() {
   const [counts, setCounts] = useState<Counts>({ athletes: 0, coaches: 0, teams: 0, tournaments: 0 })
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [attendance, setAttendance] = useState<{ day: string; present: number }[]>([])
   const [teamSports, setTeamSports] = useState<{ id: string; sport_id: string | null }[]>([])
+  const [payroll, setPayroll] = useState<PayrollRow[]>([])
+  const [awards, setAwards] = useState<AwardRow[]>([])
+  const [equip, setEquip] = useState<EquipRow[]>([])
+  const [med, setMed] = useState<MedRow[]>([])
+  const [lowStockCount, setLowStockCount] = useState(0)
+  const [pendingPO, setPendingPO] = useState(0)
+  const [notCleared, setNotCleared] = useState(0)
   const [loading, setLoading] = useState(true)
   const { byId } = useSports()
 
   const load = useCallback(async () => {
     {
-      const [ath, coa, tea, tou, mat, att, tsp] = await Promise.all([
+      const [ath, coa, tea, tou, mat, att, tsp, pay, aw, eq, po, medq] = await Promise.all([
         supabase.from('athletes').select('id', { count: 'exact', head: true }),
         supabase.from('coaches').select('id', { count: 'exact', head: true }),
         supabase.from('teams').select('id', { count: 'exact', head: true }),
@@ -49,6 +75,11 @@ export default function Dashboard() {
           .limit(6),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
         supabase.from('teams').select('id, sport_id'),
+        supabase.from('payroll').select('id, month, net, staff(profile:profiles(full_name))').order('month', { ascending: false }).limit(6),
+        supabase.from('awards').select('id, title, date, level, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(6),
+        supabase.from('inventory_items').select('id, name, quantity, min_stock, condition'),
+        supabase.from('purchase_orders').select('id, status'),
+        supabase.from('medical_records').select('id, athlete_id, type, cleared, date, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(8),
       ])
 
       setCounts({
@@ -59,6 +90,16 @@ export default function Dashboard() {
       })
       setMatches((mat.data as MatchRow[]) ?? [])
       setTeamSports((tsp.data as { id: string; sport_id: string | null }[]) ?? [])
+      setPayroll((pay.data as unknown as PayrollRow[]) ?? [])
+      setAwards((aw.data as unknown as AwardRow[]) ?? [])
+      const eqRows = (eq.data as EquipRow[]) ?? []
+      setEquip(eqRows)
+      setLowStockCount(eqRows.filter((r) => (r.quantity ?? 0) <= (r.min_stock ?? 0)).length)
+      setPendingPO(((po.data as { status: string }[]) ?? []).filter((r) => r.status === 'Ordered').length)
+      const medRows = (medq.data as unknown as MedRow[]) ?? []
+      setMed(medRows)
+      // "not cleared" = any record not cleared; approximated by unique athletes here
+      setNotCleared(new Set(medRows.filter((r) => !r.cleared).map((r) => r.athlete_id)).size)
       const attRows = (att.data ?? []) as { date: string; status: string }[]
       const byDay = new Map<string, { present: number; total: number }>()
       for (const r of attRows) {
@@ -86,6 +127,11 @@ export default function Dashboard() {
   useRealtimeTable('tournaments', load)
   useRealtimeTable('matches', load)
   useRealtimeTable('attendance', load)
+  useRealtimeTable('inventory_items', load)
+  useRealtimeTable('purchase_orders', load)
+  useRealtimeTable('medical_records', load)
+  useRealtimeTable('payroll', load)
+  useRealtimeTable('awards', load)
 
   const teamsBySport = useMemo(() => {
     const m = new Map<string, number>()
@@ -97,6 +143,8 @@ export default function Dashboard() {
   }, [teamSports, byId])
 
   if (loading) return <LoadingState />
+
+  const inr = (n: number | null | undefined) => `Rs ${Number(n ?? 0).toLocaleString('en-IN')}`
 
   return (
     <Box>
@@ -113,6 +161,24 @@ export default function Dashboard() {
         <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" />
         <StatCard label="Teams" value={counts.teams} sub="Registered squads" />
         <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" />
+      </Box>
+
+      {/* Ops strip: inventory / procurement / medical at a glance */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <StatCard
+          label="Equipment alerts"
+          value={lowStockCount}
+          sub={lowStockCount > 0 ? 'Items at or below min stock' : 'All stock levels healthy'}
+        />
+        <StatCard label="POs awaiting delivery" value={pendingPO} sub="Marked Ordered" />
+        <StatCard label="Athletes not cleared" value={notCleared} sub="From latest medical records" />
       </Box>
 
       <Box
@@ -151,7 +217,7 @@ export default function Dashboard() {
           )}
         </Section>
 
-        <Section title="Teams by Sport" action={undefined}>
+        <Section title="Teams by Sport">
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
@@ -160,7 +226,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
                 <XAxis type="number" stroke={palette.textMuted} fontSize={11} tickLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="name" stroke={palette.textMuted} fontSize={11} width={130} tickLine={false} />
-                <Tooltip
+                <RTooltip
                   contentStyle={{
                     background: palette.surface,
                     border: `1px solid ${palette.border}`,
@@ -184,7 +250,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
                 <XAxis dataKey="day" stroke={palette.textMuted} fontSize={12} tickLine={false} />
                 <YAxis stroke={palette.textMuted} fontSize={12} domain={[0, 100]} tickLine={false} />
-                <Tooltip
+                <RTooltip
                   contentStyle={{
                     background: palette.surface,
                     border: `1px solid ${palette.border}`,
@@ -198,7 +264,149 @@ export default function Dashboard() {
             </ResponsiveContainer>
           )}
         </Section>
+
+        <Section title="Latest Payroll">
+          {payroll.length === 0 ? (
+            <EmptyState text="No payroll recorded yet." />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Staff</TableCell>
+                    <TableCell>Month</TableCell>
+                    <TableCell align="right">Net Pay</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {payroll.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{p.staff?.profile?.full_name ?? '-'}</TableCell>
+                      <TableCell sx={{ color: 'text.secondary' }}>{p.month?.slice(0, 7)}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>{inr(p.net)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Section>
+
+        <Section title="Recent Awards & Achievements">
+          {awards.length === 0 ? (
+            <EmptyState text="No awards recorded yet." />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Athlete</TableCell>
+                    <TableCell>Award</TableCell>
+                    <TableCell>Level</TableCell>
+                    <TableCell align="right">Date</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {awards.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>{a.athletes?.profile?.full_name ?? '-'}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{a.title}</TableCell>
+                      <TableCell><Badge color={a.level === 'National' ? 'error' : a.level === 'State' ? 'warning' : a.level === 'District' ? 'info' : 'success'}>{a.level ?? '-'}</Badge></TableCell>
+                      <TableCell align="right" sx={{ color: 'text.secondary' }}>
+                        {a.date ? new Date(a.date + 'T00:00:00').toLocaleDateString() : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Section>
+
+        <Section title="Equipment Watchlist">
+          {equip.length === 0 ? (
+            <EmptyState text="No inventory items yet." />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Item</TableCell>
+                    <TableCell>Stock</TableCell>
+                    <TableCell>Level</TableCell>
+                    <TableCell>Condition</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {[...equip]
+                    .sort((a, b) => (a.quantity ?? 0) - (b.quantity ?? 0))
+                    .slice(0, 6)
+                    .map((r) => {
+                      const min = r.min_stock ?? 0
+                      const q = r.quantity ?? 0
+                      const pct = min > 0 ? Math.min(100, Math.round((q / (min * 2)) * 100)) : 100
+                      const low = q <= min
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell>{r.name}</TableCell>
+                          <TableCell>{q}</TableCell>
+                          <TableCell sx={{ width: 140 }}>
+                            <Tooltip title={low ? 'At or below minimum' : 'Healthy'}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={pct}
+                                color={low ? 'warning' : 'success'}
+                                sx={{ height: 6, borderRadius: 3 }}
+                              />
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell sx={{ color: 'text.secondary' }}>{r.condition ?? '-'}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Section>
+
+        <Section title="Medical Watchlist" sx={{ gridColumn: { md: '1 / -1' } }}>
+          {med.length === 0 ? (
+            <EmptyState text="No medical records yet." />
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Athlete</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Clearance</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {med.slice(0, 8).map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.athletes?.profile?.full_name ?? '-'}</TableCell>
+                      <TableCell>{r.type}</TableCell>
+                      <TableCell sx={{ color: 'text.secondary' }}>
+                        {r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge color={r.cleared ? 'success' : 'error'}>{r.cleared ? 'Cleared' : 'Not cleared'}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Section>
       </Box>
+
+      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+        Live data - all cards update in real time from both web and mobile.
+      </Typography>
     </Box>
   )
 }
