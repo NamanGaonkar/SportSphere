@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/sports.dart';
+import '../main.dart' show Brand;
 import '../widgets/common.dart';
 import 'crud_page.dart' show DbRow;
 
@@ -31,10 +32,17 @@ class _ReportsPageState extends State<ReportsPage> {
     _load();
     _c1 = listen('athlete_sports', _load);
     _c2 = listen('teams', _load);
+    // Re-render when sport names arrive ("Teams by Sport" pie parity).
+    SportsCache.instance.addListener(_onSports);
+  }
+
+  void _onSports() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    SportsCache.instance.removeListener(_onSports);
     if (_c1 != null) client.removeChannel(_c1!);
     if (_c2 != null) client.removeChannel(_c2!);
     super.dispose();
@@ -122,6 +130,32 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          // Organization Snapshot — web Reports parity (fills the grid slot).
+          SectionCard(
+            title: 'Organization Snapshot',
+            child: LayoutBuilder(builder: (context, c) {
+              const gap = 12.0;
+              final w = (c.maxWidth - gap) / 2;
+              final teams = _teamSports.fold<int>(0, (s, e) => s + e.value);
+              final sportsPlayed =
+                  _athleteSports.where((e) => e.key != 'Unassigned').length;
+              final entries = _athleteSports.fold<int>(0, (s, e) => s + e.value.toInt());
+              final avgAtt = _attendance.isEmpty
+                  ? 0
+                  : _attendance.fold<int>(0, (s, e) => s + e.pct.toInt()) ~/ _attendance.length;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  SizedBox(width: w, child: _snapshotStat('TEAMS', '$teams', 'Across all sports')),
+                  SizedBox(width: w, child: _snapshotStat('SPORTS PLAYED', '$sportsPlayed', 'Active disciplines')),
+                  SizedBox(width: w, child: _snapshotStat('ATHLETE ENTRIES', '$entries', 'Athlete-sport registrations')),
+                  SizedBox(width: w, child: _snapshotStat('AVG ATTENDANCE', '$avgAtt%', '30-day average')),
+                ],
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
           SectionCard(
             title: 'Recent Awards & Achievements',
             centerChild: _awards.isEmpty,
@@ -193,3 +227,28 @@ const _headStyle = TextStyle(
 /// Shared dashboard/reports table header style.
 const dashHeadStyle = TextStyle(
     fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.black54);
+
+/// Orange-tinted snapshot stat (web SnapshotStat parity).
+Widget _snapshotStat(String label, String value, String sub) {
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF1E7),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Brand.primary.withValues(alpha: 0.25)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
+        const SizedBox(height: 4),
+        Text(value,
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
+        const SizedBox(height: 2),
+        Text(sub, style: const TextStyle(fontSize: 11, color: Colors.black45)),
+      ],
+    ),
+  );
+}

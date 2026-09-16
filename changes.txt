@@ -116,3 +116,31 @@ Layout & parity fixes
 - Alerts (#19): realtime subscription — new alerts appear instantly, unread dots, tap to mark read, plus a DB index so loading is instant.
 
 Verified:  tsc  clean ·  vite build  clean ·  flutter analyze  0 issues · admin insert audit passes · app launches and runs with zero  FATAL EXCEPTION s.
+
+
+All four things done and installed:
+
+1. "Teams by Sport" showing one "No sport" bar with 16 — fixed
+
+The data was fine (16 teams across 10 sports, all with valid sport IDs). The bug was a cold-start race: the app's sports-name cache loads asynchronously, and the dashboard computed the chart before the names arrived — so every team fell into the "No sport" bucket. Fixed three ways:
+- The cache is now warmed at app startup (before the first screen)
+- The dashboard awaits the sports list before computing the chart
+- The dashboard listens to the cache, so if names arrive late the chart re-renders instantly with real sport names
+
+Same fix applied to the Reports pie. You'll now see Football (4), Athletics (2), Basketball (2), Cricket (2), etc.
+
+2. Orange-tinted stat cards on both apps
+
+Every stat card (dashboard counts, ops strip, snapshot stats) now has the ~55% orange tint ( #FFF1E7  background, orange border, burnt-orange labels) — identical on web and phone, so they pop with the brand.
+
+3. Web "Teams by Sport" now fills its card
+
+The chart was rendering at its intrinsic size inside the card. It's now wrapped in a full-width/height container with band scaling, so the bars stretch edge-to-edge of the card.
+
+4. New "Organization Snapshot" card fills the Reports gap (web + phone)
+
+The empty slot in the Reports grid now holds a Organization Snapshot card with four orange stat tiles: Teams, Sports Played, Athlete Entries, and Avg Attendance (30-day). The exact same card was added to the phone's Reports page — same data, same order, same look.
+
+Verified:  tsc  clean ·  vite build  clean ·  flutter analyze  0 issues · 22.9MB APK with env defines byte-verified, installed  Success , app running.
+
+Note: the web dev server needs a restart to pick up the changes if it's still running the old bundle — the build output is already refreshed.

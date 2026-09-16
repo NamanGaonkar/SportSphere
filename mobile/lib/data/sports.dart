@@ -22,7 +22,25 @@ class SportsCache extends ChangeNotifier {
   List<Map<String, dynamic>> rows = [];
   final Map<String, String> _names = {};
 
+  /// Force-start the fetch immediately (cold-start pre-warm). The lazy
+  /// singleton otherwise loads too late: the dashboard would compute
+  /// "Teams by Sport" before any sport names exist and show "No sport".
+  static void warm() => instance;
+
+  /// Awaited by pages that need valid names on first paint.
+  Future<void> get ready async {
+    final f = _loading;
+    if (f != null) await f;
+  }
+  Future<void>? _loading;
+
   Future<void> _load() async {
+    final f = _doLoad();
+    _loading = f;
+    await f;
+  }
+
+  Future<void> _doLoad() async {
     try {
       final data = await Supabase.instance.client
           .from('sports')

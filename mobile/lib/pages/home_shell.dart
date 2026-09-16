@@ -384,6 +384,8 @@ class _DashboardHomeState extends State<DashboardHome> {
   RealtimeChannel? _cPO;
   RealtimeChannel? _cMed;
 
+  bool _sportsBound = false;
+
   @override
   void initState() {
     super.initState();
@@ -395,10 +397,18 @@ class _DashboardHomeState extends State<DashboardHome> {
     _cInv = listen('inventory_items', _load);
     _cPO = listen('purchase_orders', _load);
     _cMed = listen('medical_records', _load);
+    // Sport names load async — re-render when the cache fills so
+    // "Teams by Sport" shows real names instead of "No sport".
+    SportsCache.instance.addListener(_onSports);
+  }
+
+  void _onSports() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    SportsCache.instance.removeListener(_onSports);
     for (final c in [_cTeams, _cMatches, _cAtt, _cSports, _cInv, _cPO, _cMed]) {
       if (c != null) Supabase.instance.client.removeChannel(c);
     }
@@ -409,6 +419,11 @@ class _DashboardHomeState extends State<DashboardHome> {
     final c = Supabase.instance.client;
     final uid = c.auth.currentUser?.id;
     try {
+      // Guarantee sport names are in memory before the chart computes.
+      if (!_sportsBound) {
+        _sportsBound = true;
+        await SportsCache.instance.ready;
+      }
       final results = await Future.wait<dynamic>([
         c.from('athletes').select('id'),
         c.from('coaches').select('id'),

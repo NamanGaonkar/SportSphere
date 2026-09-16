@@ -210,32 +210,47 @@ export default function Dashboard() {
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={teamsBySport} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke={palette.textMuted}
-                  fontSize={11}
-                  tickLine={false}
-                  allowDecimals={false}
-                  // Scale to the data with one step of headroom so the longest
-                  // bar never touches the edge.
-                  domain={[0, (max: number) => Math.ceil(max + 1)]}
-                />
-                <YAxis type="category" dataKey="name" stroke={palette.textMuted} fontSize={11} width={130} tickLine={false} />
-                <RTooltip
-                  contentStyle={{
-                    background: palette.surface,
-                    border: `1px solid ${palette.border}`,
-                    borderRadius: 10,
-                    fontFamily: 'Lato, sans-serif',
-                  }}
-                  labelStyle={{ color: palette.black, fontWeight: 700 }}
-                />
-                <Bar dataKey="teams" fill={palette.primary} radius={[0, 6, 6, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Box sx={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={teamsBySport}
+                  layout="vertical"
+                  margin={{ left: 4, right: 28, top: 4, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    stroke={palette.textMuted}
+                    fontSize={11}
+                    tickLine={false}
+                    allowDecimals={false}
+                    // Scale to the data with one step of headroom so the longest
+                    // bar never touches the edge.
+                    domain={[0, (max: number) => Math.ceil(max + 1)]}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke={palette.textMuted}
+                    fontSize={11}
+                    width={130}
+                    tickLine={false}
+                    // Scale bar band to fill the plot height evenly.
+                    scale="band"
+                  />
+                  <RTooltip
+                    contentStyle={{
+                      background: palette.surface,
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: 10,
+                      fontFamily: 'Lato, sans-serif',
+                    }}
+                    labelStyle={{ color: palette.black, fontWeight: 700 }}
+                  />
+                  <Bar dataKey="teams" fill={palette.primary} radius={[0, 6, 6, 0]} barSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
           )}
         </Section>
 

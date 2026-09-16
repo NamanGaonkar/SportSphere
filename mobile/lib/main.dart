@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'data/sports.dart';
 import 'pages/home_shell.dart' show initShellPrefs;
 import 'pages/splash_page.dart';
 
@@ -95,6 +96,8 @@ Future<void> main() async {
   }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseAnonKey);
   await initShellPrefs();
+  // Start the sports lookup early so dashboard charts have names on first paint.
+  SportsCache.warm();
   runApp(const SportSphereApp());
 }
 

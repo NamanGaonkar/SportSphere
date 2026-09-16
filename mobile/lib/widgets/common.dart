@@ -169,7 +169,15 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 55% orange tint — makes the stat cards pop on both apps (brand pop).
+    const tint = Color(0xFFFFF1E7); // ~55% toward white from Brand.primary
     return Card(
+      color: tint,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Brand.primary.withValues(alpha: 0.25)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -177,14 +185,16 @@ class StatCard extends StatelessWidget {
           children: [
             Text(label,
                 style: const TextStyle(
-                    fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Colors.black54)),
+                    fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
             const SizedBox(height: 6),
             // FittedText keeps long values (e.g. "Rs 12,34,567") inside the
             // card: the font shrinks to fit one line instead of overflowing.
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.15)),
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
             ),
             if (sub != null)
               Padding(

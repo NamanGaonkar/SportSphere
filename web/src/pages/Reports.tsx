@@ -4,6 +4,7 @@ import { useSports, useRealtimeTable } from '../lib/hooks'
 import { attendanceWindow } from '../lib/dates'
 import { PageHead, Section, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -20,6 +21,25 @@ const CHART_COLORS = [palette.primary, palette.success, palette.warning, palette
 type SportCount = { sports: { name: string } | null }
 type AttRow = { date: string; status: string }
 type AwardRow = { id: string; title: string; date: string | null; level: string | null; athletes: { profile: { full_name: string } | null } | null }
+
+function SnapshotStat({ label, value, sub }: { label: string; value: number | string; sub: string }) {
+  return (
+    <Box
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        bgcolor: '#FFF1E7',
+        border: '1px solid rgba(255,106,19,0.25)',
+      }}
+    >
+      <Typography sx={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#B25A1F' }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
+      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{sub}</Typography>
+    </Box>
+  )
+}
 
 export default function Reports() {
   const [sportData, setSportData] = useState<{ name: string; value: number }[]>([])
@@ -140,6 +160,28 @@ export default function Reports() {
               <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
+        </Section>
+
+        {/* Fills the third grid slot so there is no empty hole in the layout. */}
+        <Section title="Organization Snapshot">
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <SnapshotStat label="Teams" value={teamsSportData.reduce((s, d) => s + d.value, 0)} sub="Across all sports" />
+            <SnapshotStat label="Sports played" value={sportData.filter((d) => d.name !== 'Unassigned').length} sub="Active disciplines" />
+            <SnapshotStat
+              label="Athlete entries"
+              value={sportData.reduce((s, d) => s + d.value, 0)}
+              sub="Athlete-sport registrations"
+            />
+            <SnapshotStat
+              label="Avg attendance"
+              value={
+                attData.length
+                  ? `${Math.round(attData.reduce((s, d) => s + d.present, 0) / attData.length)}%`
+                  : '0%'
+              }
+              sub="30-day average"
+            />
+          </Box>
         </Section>
       </Box>
 
