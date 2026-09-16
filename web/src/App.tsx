@@ -27,7 +27,8 @@ import {
   ManageAccounts as ManageAccountsIcon,
   AccountCircle as AccountCircleIcon,
 } from '@mui/icons-material'
-import { supabase } from './lib/supabase'
+import { supabase, envConfigured } from './lib/supabase'
+import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Athletes from './pages/Athletes'
@@ -129,6 +130,15 @@ const NAV_SECTIONS: {
 ]
 
 export default function App() {
+  // Hard guard: never attempt auth/data on a misconfigured deployment.
+  if (!envConfigured) {
+    return (
+      <Routes>
+        <Route path="*" element={<ConfigError />} />
+      </Routes>
+    )
+  }
+
   const [session, setSession] = useState<Session>(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()

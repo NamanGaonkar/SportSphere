@@ -10,7 +10,8 @@ Test accounts — all created and login-verified
 │ Coach        │ Coach One         │ coach@sportsphere.app        │ Test@1234 │
 │ HR           │ HR Manager        │ hr@sportsphere.app           │ Test@1234 │
 │ Finance      │ Finance Lead      │ finance@sportsphere.app      │ Test@1234 │
-│ VenueManager │ Venue Manager     │ venuemanager@sportsphere.app │ Test@1234 
+│ VenueManager │ Venue Manager     │ venuemanager@sportsphere.app │ Test@1234 |
+|______________|___________________|______________________________|___________|
 
  Read remaining web pages I'll modify (Dashboard, Teams, Tournaments, Matches, modules, Reports, Athletes, ui)
 ☐  DB migration: sports table + athlete_sports join + sport_id on teams/tournaments/training_sessions + backfill + RLS + realtime publication + attendance self-update policy
