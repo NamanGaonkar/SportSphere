@@ -68,26 +68,19 @@ class _ReportsPageState extends State<ReportsPage> {
         final key = name.isEmpty ? 'No sport' : name;
         tm[key] = (tm[key] ?? 0) + 1;
       }
-      final byDay = <String, List<int>>{};
-      for (final r in (results[2] as List).cast<DbRow>()) {
-        final day = '${r['date']}'.split('T').first;
-        final e = byDay.putIfAbsent(day, () => [0, 0]);
-        e[1] += 1;
-        final st = '${r['status']}';
-        if (st == 'Present' || st == 'Late') e[0] += 1;
-      }
-      final days = byDay.keys.toList()..sort();
+      // Shared rolling 30-day window (same algorithm as web lib/dates.ts).
+      final window = attendanceWindow(
+        (results[2] as List)
+            .cast<DbRow>()
+            .map((r) => (date: '${r['date']}', status: '${r['status']}'))
+            .toList(),
+        30,
+      );
 
       setState(() {
         _athleteSports = am.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _teamSports = tm.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-        _attendance = [
-          for (final d in days)
-            (
-              day: '${int.parse(d.split('-')[2])} ${months[int.parse(d.split('-')[1]) - 1]}',
-              pct: byDay[d]![1] == 0 ? 0 : (byDay[d]![0] * 100 ~/ byDay[d]![1]),
-            ),
-        ];
+        _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
         _awards = (results[3] as List).cast<DbRow>();
         _loading = false;
       });
@@ -110,21 +103,28 @@ class _ReportsPageState extends State<ReportsPage> {
               sub: 'Organization analytics - rosters, attendance and achievements.'),
           SectionCard(
             title: 'Athletes by Sport',
+            centerChild: true,
             child: DonutPie(_athleteSports),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Teams by Sport',
+            centerChild: true,
             child: DonutPie(_teamSports),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Attendance Rate - Last 30 Days (%)',
-            child: VBars([for (final a in _attendance) MapEntry(a.day, a.pct)]),
+            child: VBars(
+              [for (final a in _attendance) DayPoint('', a.day, 0, 0, a.pct.toInt())],
+              barWidth: 9,
+              height: 190,
+            ),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Recent Awards & Achievements',
+            centerChild: _awards.isEmpty,
             child: _awards.isEmpty
                 ? const EmptyState('No awards recorded yet.')
                 : Column(

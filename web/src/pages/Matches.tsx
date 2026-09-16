@@ -280,7 +280,12 @@ export default function Matches() {
               <TextField
                 type="datetime-local" label="Scheduled at" value={form.scheduled_at}
                 onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
-                slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ gridColumn: '1 / -1' }}
+                slotProps={{
+                  inputLabel: { shrink: true },
+                  // New fixtures cannot be scheduled in the past.
+                  htmlInput: { min: editing ? undefined : new Date().toISOString().slice(0, 16) },
+                }}
+                fullWidth sx={{ gridColumn: '1 / -1' }}
               />
             </Box>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

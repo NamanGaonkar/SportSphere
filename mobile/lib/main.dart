@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'pages/home_shell.dart' show initShellPrefs;
 import 'pages/splash_page.dart';
 
 /// Supabase credentials are injected at build time, e.g.:
@@ -93,6 +94,7 @@ Future<void> main() async {
     return;
   }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseAnonKey);
+  await initShellPrefs();
   runApp(const SportSphereApp());
 }
 

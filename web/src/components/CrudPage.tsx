@@ -27,6 +27,7 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
 import { PageHead, EmptyState, LoadingState } from './ui'
+import ExpandableRow from './ExpandableRow'
 import dataTableSx from './tableSx'
 
 export type FieldDef = {
@@ -242,6 +243,7 @@ export default function CrudPage({
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox" sx={{ width: 40 }} />
                     {columns.map((c) => <TableCell key={c.key}>{c.label}</TableCell>)}
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -250,13 +252,22 @@ export default function CrudPage({
                   {filtered
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((row) => (
-                      <TableRow key={String(row.id)} hover>
+                      <ExpandableRow
+                        key={String(row.id)}
+                        detail={[
+                          ...columns.map((c) => ({
+                            k: c.label,
+                            v: c.render ? c.render(row) : displayValue(fields.find((f) => f.key === c.key) ?? { key: c.key, label: c.label }, row),
+                          })),
+                          { k: 'Created', v: row.created_at ? new Date(String(row.created_at)).toLocaleString() : '-' },
+                        ]}
+                      >
                         {columns.map((c) => (
-                          <TableCell key={c.key}>
+                          <TableCell key={c.key} onClick={(e) => e.stopPropagation()}>
                             {c.render ? c.render(row) : displayValue(fields.find((f) => f.key === c.key) ?? { key: c.key, label: c.label }, row)}
                           </TableCell>
                         ))}
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                           <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit">
                             <EditOutlinedIcon fontSize="small" />
                           </IconButton>
@@ -264,7 +275,7 @@ export default function CrudPage({
                             <DeleteOutlinedIcon fontSize="small" />
                           </IconButton>
                         </TableCell>
-                      </TableRow>
+                      </ExpandableRow>
                     ))}
                 </TableBody>
               </Table>

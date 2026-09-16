@@ -413,6 +413,27 @@ class _CrudListState extends State<CrudList> {
     }).toList();
   }
 
+  /// Full detail lines for the expanded row panel: every column resolved
+  /// to a human value, plus created timestamp.
+  List<MapEntry<String, String>> _detailFor(DbRow row) {
+    final out = <MapEntry<String, String>>[];
+    for (final c in widget.columns) {
+      final matches = widget.fields.where((x) => x.key == c.key).toList();
+      final f = matches.isEmpty ? FieldDef(c.key, c.label) : matches.first;
+      final cell = c.render?.call(row) ?? Text(_display(f, row));
+      final text = _cellText(cell);
+      out.add(MapEntry(c.label, text));
+    }
+    out.add(MapEntry('Created', fmtDateTime(row['created_at']?.toString())));
+    return out;
+  }
+
+  static String _cellText(Widget w) {
+    if (w is Text) return w.data ?? w.textSpan?.toPlainText() ?? '-';
+    if (w is RichText) return w.text.toPlainText();
+    return '-';
+  }
+
   String _display(FieldDef f, DbRow row) {
     final v = row[f.key];
     switch (f.type) {
@@ -472,6 +493,7 @@ class _CrudListState extends State<CrudList> {
                 : PagedTable(
                     items: filtered,
                     emptyText: 'No records yet. Use the Add button to create the first one.',
+                    detailBuilder: (row) => _detailFor(row),
                     columns: [
                       for (final c in widget.columns) DataColumn(label: Text(c.label)),
                       const DataColumn(label: Text('Actions')),

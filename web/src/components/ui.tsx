@@ -41,7 +41,18 @@ export function StatCard({ label, value, sub }: { label: string; value: ReactNod
       >
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, mt: 0.5 }}>{value}</Typography>
+      <Typography
+        sx={{
+          fontSize: { xs: 26, md: 34 },
+          fontWeight: 700,
+          lineHeight: 1.2,
+          mt: 0.5,
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
+        }}
+      >
+        {value}
+      </Typography>
       {sub && (
         <Typography variant="caption" sx={{ color: 'text.secondary', mt: 'auto' }}>
           {sub}

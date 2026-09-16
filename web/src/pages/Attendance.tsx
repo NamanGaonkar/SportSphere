@@ -116,8 +116,12 @@ export default function Attendance() {
             size="small"
             label="Date"
             value={date}
+            slotProps={{
+              inputLabel: { shrink: true },
+              // Attendance can only be recorded for today onward.
+              htmlInput: { min: new Date().toISOString().slice(0, 10) },
+            }}
             onChange={(e) => setDate(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
           />
         }
       />

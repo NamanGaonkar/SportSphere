@@ -25,6 +25,7 @@ import {
   DirectionsBus as TransportIcon, Hotel as AccommodationIcon,
   Speed as PerformanceIcon, MedicalServices as MedicalIcon,
   ManageAccounts as ManageAccountsIcon,
+  AccountCircle as AccountCircleIcon,
 } from '@mui/icons-material'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
@@ -46,6 +47,7 @@ import {
 } from './pages/modules'
 import Purchases from './pages/Purchases'
 import Users from './pages/Users'
+import Profile from './pages/Profile'
 
 export type Profile = {
   id: string
@@ -73,13 +75,19 @@ const NAV_SECTIONS: {
     ],
   },
   {
+    section: 'My Account',
+    items: [
+      { to: '/profile', label: 'My Profile', icon: AccountCircleIcon },
+      { to: '/users', label: 'User Management', icon: ManageAccountsIcon, roles: ['Admin'] },
+    ],
+  },
+  {
     section: 'People',
     items: [
-      { to: '/athletes', label: 'Athletes', icon: AthletesIcon },
-      { to: '/coaches', label: 'Coaches', icon: CoachesIcon },
+      { to: '/athletes', label: 'Athletes', icon: AthletesIcon, roles: ['Admin', 'Coach', 'HR'] },
+      { to: '/coaches', label: 'Coaches', icon: CoachesIcon, roles: ['Admin', 'HR'] },
       { to: '/teams', label: 'Teams', icon: TeamsIcon },
-      { to: '/staff', label: 'Staff & HR', icon: StaffIcon },
-      { to: '/users', label: 'User Management', icon: ManageAccountsIcon, roles: ['Admin'] },
+      { to: '/staff', label: 'Staff & HR', icon: StaffIcon, roles: ['Admin', 'HR'] },
     ],
   },
   {
@@ -96,26 +104,26 @@ const NAV_SECTIONS: {
     items: [
       { to: '/attendance', label: 'Attendance & Leave', icon: AttendanceIcon },
       { to: '/inventory', label: 'Inventory', icon: InventoryIcon },
-      { to: '/housekeeping', label: 'Housekeeping', icon: HousekeepingIcon },
-      { to: '/purchases', label: 'Vendors & Purchases', icon: PurchasesIcon },
+      { to: '/housekeeping', label: 'Housekeeping', icon: HousekeepingIcon, roles: ['Admin', 'VenueManager'] },
+      { to: '/purchases', label: 'Vendors & Purchases', icon: PurchasesIcon, roles: ['Admin', 'Finance', 'HR'] },
       { to: '/expenses', label: 'Finance & Expenses', icon: ExpensesIcon, roles: ['Admin', 'Finance', 'HR'] },
     ],
   },
   {
     section: 'Programs & Logistics',
     items: [
-      { to: '/training', label: 'Training & Camps', icon: TrainingIcon },
-      { to: '/activities', label: 'School Activities', icon: ActivitiesIcon },
+      { to: '/training', label: 'Training & Camps', icon: TrainingIcon, roles: ['Admin', 'Coach'] },
+      { to: '/activities', label: 'School Activities', icon: ActivitiesIcon, roles: ['Admin', 'Coach'] },
       { to: '/events', label: 'Events', icon: EventsIcon },
-      { to: '/transport', label: 'Transport', icon: TransportIcon },
-      { to: '/accommodation', label: 'Accommodation', icon: AccommodationIcon },
+      { to: '/transport', label: 'Transport', icon: TransportIcon, roles: ['Admin', 'VenueManager', 'Coach'] },
+      { to: '/accommodation', label: 'Accommodation', icon: AccommodationIcon, roles: ['Admin', 'VenueManager', 'Coach'] },
     ],
   },
   {
     section: 'Athlete Care',
     items: [
-      { to: '/performance', label: 'Performance', icon: PerformanceIcon },
-      { to: '/medical', label: 'Medical', icon: MedicalIcon },
+      { to: '/performance', label: 'Performance', icon: PerformanceIcon, roles: ['Admin', 'Coach'] },
+      { to: '/medical', label: 'Medical', icon: MedicalIcon, roles: ['Admin', 'Coach', 'HR'] },
     ],
   },
 ]
@@ -332,6 +340,7 @@ export default function App() {
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/housekeeping" element={<Housekeeping />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/expenses" element={<Expenses />} />

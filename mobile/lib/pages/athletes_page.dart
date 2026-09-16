@@ -215,6 +215,8 @@ class _AthletesPageState extends State<AthletesPage> {
                       DateField(
                         label: 'Date of birth',
                         value: dob,
+                        // DOB is always in the past — allow from 2000.
+                        firstDate: DateTime(2000),
                         onChanged: (v) => setM(() => dob = v ?? ''),
                       ),
                       const SizedBox(height: 14),

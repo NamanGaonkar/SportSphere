@@ -26,6 +26,7 @@ import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
 import { SportMultiSelect } from '../components/SportSelect'
 import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
+import ExpandableRow from '../components/ExpandableRow'
 import dataTableSx from '../components/tableSx'
 
 type Athlete = {
@@ -193,6 +194,7 @@ export default function Athletes() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox" sx={{ width: 40 }} />
                     <TableCell>Name</TableCell>
                     <TableCell>Sports</TableCell>
                     <TableCell>Team</TableCell>
@@ -205,17 +207,31 @@ export default function Athletes() {
                   {filtered
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((r) => (
-                      <TableRow key={r.id} hover>
-                        <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
-                        <TableCell>{sportNames(r)}</TableCell>
-                        <TableCell>{r.teams?.name ?? '-'}</TableCell>
-                        <TableCell>{age(r.dob) ?? '-'}</TableCell>
-                        <TableCell>
+                      <ExpandableRow
+                        key={r.id}
+                        chips={[
+                          { label: r.teams?.name ?? 'No team', color: 'primary' },
+                          { label: r.medical_notes ? 'Medical notes' : 'Medically OK', color: r.medical_notes ? 'warning' : 'success' },
+                        ]}
+                        detail={[
+                          { k: 'Full name', v: r.profile?.full_name ?? '-' },
+                          { k: 'Sports', v: sportNames(r) },
+                          { k: 'Team', v: r.teams?.name ?? '-' },
+                          { k: 'Date of birth', v: r.dob ?? '-' },
+                          { k: 'Age', v: age(r.dob) ?? '-' },
+                          { k: 'Medical notes', v: r.medical_notes || '-' },
+                        ]}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>{r.profile?.full_name ?? '-'}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>{sportNames(r)}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>{r.teams?.name ?? '-'}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>{age(r.dob) ?? '-'}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {r.medical_notes
                             ? <Badge color="warning">{r.medical_notes.length > 28 ? r.medical_notes.slice(0, 28) + '...' : r.medical_notes}</Badge>
                             : <Badge color="success">OK</Badge>}
                         </TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                           <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
                             <EditOutlinedIcon fontSize="small" />
                           </IconButton>
@@ -223,7 +239,7 @@ export default function Athletes() {
                             <DeleteOutlinedIcon fontSize="small" />
                           </IconButton>
                         </TableCell>
-                      </TableRow>
+                      </ExpandableRow>
                     ))}
                 </TableBody>
               </Table>

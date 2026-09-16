@@ -89,7 +89,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 children: [
                   SizedBox(width: w, child: StatCard(label: 'ITEMS', value: '${_rows.length}', sub: '$units units in stock')),
                   SizedBox(width: w, child: StatCard(label: 'LOW STOCK', value: '${low.length}', sub: 'At or below minimum')),
-                  SizedBox(width: w, child: StatCard(label: 'VALUE', value: inr(_totalValue), sub: 'Qty x unit cost')),
+                  SizedBox(width: w, child: StatCard(label: 'VALUE', value: inrCompact(_totalValue), sub: 'Qty x unit cost')),
                 ],
               );
             }),
@@ -145,6 +145,25 @@ class _InventoryPageState extends State<InventoryPage> {
       child: PagedTable(
         items: _rows,
         emptyText: 'No inventory items yet.',
+        detailBuilder: (r) => [
+          MapEntry('Item', '${r['name'] ?? '-'}'),
+          MapEntry('Category', '${r['category'] ?? '-'}'),
+          MapEntry('Stock', '${r['quantity'] ?? 0} ${r['unit'] ?? ''} (min ${r['min_stock'] ?? 0})'),
+          MapEntry('Condition', '${r['condition'] ?? '-'}'),
+          MapEntry('Location', '${r['location'] ?? '-'}'),
+          MapEntry('Assigned team', '${((r['teams'] ?? {}) as Map)['name'] ?? '-'}'),
+          MapEntry('Unit cost', inr(_n(r['unit_cost']))),
+          MapEntry('Total value', inr(_n(r['quantity']) * _n(r['unit_cost']))),
+        ],
+        chipsBuilder: (r) {
+          final qty = _n(r['quantity']).toInt();
+          final minq = _n(r['min_stock']).toInt();
+          final low = qty <= minq;
+          return [
+            (low ? 'Low stock' : 'Healthy stock', low ? const Color(0xFFB26A00) : const Color(0xFF2E7D32)),
+            ('Stock value ${inr(_n(r['quantity']) * _n(r['unit_cost']))}', Brand.primary),
+          ];
+        },
         columns: const [
           DataColumn(label: Text('Item')),
           DataColumn(label: Text('Stock')),
@@ -201,6 +220,14 @@ class _InventoryPageState extends State<InventoryPage> {
       child: PagedTable(
         items: _txs,
         emptyText: 'No stock movements yet.',
+        detailBuilder: (t) => [
+          MapEntry('Item', '${((t['inventory_items'] ?? {}) as Map)['name'] ?? '-'}'),
+          MapEntry('Type', '${t['tx_type']}'),
+          MapEntry('Quantity', '${t['quantity']}'),
+          MapEntry('Note', '${t['note'] ?? '-'}'),
+          MapEntry('By', '${((t['profiles'] ?? {}) as Map)['full_name'] ?? '-'}'),
+          MapEntry('When', fmtDateTime(t['created_at']?.toString())),
+        ],
         columns: const [
           DataColumn(label: Text('Item')),
           DataColumn(label: Text('Type')),
@@ -227,7 +254,9 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Future<void> _move(DbRow item) async {
+  num _n(dynamic v) => v is num ? v : (num.tryParse('${v ?? ''}') ?? 0);
+
+Future<void> _move(DbRow item) async {
     final qtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     var type = 'IN';

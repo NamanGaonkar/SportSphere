@@ -63,7 +63,6 @@ class _TournamentsPageState extends State<TournamentsPage> {
     final filtered = _filtered;
     final total = filtered.length;
     if (_page > (total - 1) ~/ _perPage) _page = total == 0 ? 0 : (total - 1) ~/ _perPage;
-    final slice = filtered.skip(_page * _perPage).take(_perPage).toList();
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -100,72 +99,51 @@ class _TournamentsPageState extends State<TournamentsPage> {
           Card(
             child: _loading
                 ? const LoadingState()
-                : total == 0
-                    ? const EmptyState('No tournaments yet.')
-                    : Column(mainAxisSize: MainAxisSize.min, children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: 22,
-                            headingRowHeight: 44,
-                            headingTextStyle: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black54),
-                            headingRowColor: const WidgetStatePropertyAll(Color(0xFFF5F5F0)),
-                            columns: const [
-                              DataColumn(label: Text('Name')),
-                              DataColumn(label: Text('Sport')),
-                              DataColumn(label: Text('Level')),
-                              DataColumn(label: Text('Dates')),
-                              DataColumn(label: Text('Venue')),
-                              DataColumn(label: Text('Matches')),
-                              DataColumn(label: Text('Actions')),
-                            ],
-                            rows: [
-                              for (final t in slice)
-                                DataRow(cells: [
-                                  DataCell(Text('${t['name'] ?? '-'}')),
-                                  DataCell(Text('${((t['sports'] ?? {}) as Map)['name'] ?? '-'}')),
-                                  DataCell(BadgeChip('${t['level'] ?? '-'}',
-                                      color: levelColor('${t['level'] ?? ''}'))),
-                                  DataCell(Text(
-                                      '${fmtDate(t['start_date']?.toString())} to ${fmtDate(t['end_date']?.toString())}')),
-                                  DataCell(Text('${((t['venues'] ?? {}) as Map)['name'] ?? '-'}')),
-                                  DataCell(Text(
-                                      '${((t['matches'] as List?) ?? const []).isNotEmpty ? (t['matches'] as List)[0]['count'] : 0}')),
-                                  DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      icon: const Icon(Icons.edit_outlined, size: 19),
-                                      onPressed: () => _showForm(t),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      icon: const Icon(Icons.delete_outline,
-                                          size: 19, color: Color(0xFFC62828)),
-                                      onPressed: () => _remove(t),
-                                    ),
-                                  ])),
-                                ]),
-                            ],
-                          ),
+                : PagedTable(
+                    items: filtered,
+                    emptyText: 'No tournaments yet.',
+                    detailBuilder: (t) => [
+                      MapEntry('Name', '${t['name'] ?? '-'}'),
+                      MapEntry('Sport', '${((t['sports'] ?? {}) as Map)['name'] ?? '-'}'),
+                      MapEntry('Level', '${t['level'] ?? '-'}'),
+                      MapEntry('Start date', fmtDate(t['start_date']?.toString())),
+                      MapEntry('End date', fmtDate(t['end_date']?.toString())),
+                      MapEntry('Venue', '${((t['venues'] ?? {}) as Map)['name'] ?? '-'}'),
+                      MapEntry(
+                          'Matches',
+                          '${((t['matches'] as List?) ?? const []).isNotEmpty ? (t['matches'] as List)[0]['count'] : 0}'),
+                    ],
+                    chipsBuilder: (t) => [
+                      ('${t['level'] ?? '-'}', levelColor('${t['level'] ?? ''}')),
+                    ],
+                    columns: const [
+                      DataColumn(label: Text('Name')),
+                      DataColumn(label: Text('Sport')),
+                      DataColumn(label: Text('Level')),
+                      DataColumn(label: Text('Venue')),
+                      DataColumn(label: Text('Actions')),
+                    ],
+                    rowBuilder: (t) => DataRow(cells: [
+                      DataCell(Text('${t['name'] ?? '-'}')),
+                      DataCell(Text('${((t['sports'] ?? {}) as Map)['name'] ?? '-'}')),
+                      DataCell(BadgeChip('${t['level'] ?? '-'}',
+                          color: levelColor('${t['level'] ?? ''}'))),
+                      DataCell(Text('${((t['venues'] ?? {}) as Map)['name'] ?? '-'}')),
+                      DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.edit_outlined, size: 19),
+                          onPressed: () => _showForm(t),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                          child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              onPressed: _page > 0 ? () => setState(() => _page--) : null,
-                              icon: const Icon(Icons.chevron_left),
-                            ),
-                            Text('${_page + 1}', style: const TextStyle(fontSize: 12.5)),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              onPressed: (_page + 1) * _perPage < total ? () => setState(() => _page++) : null,
-                              icon: const Icon(Icons.chevron_right),
-                            ),
-                          ]),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.delete_outline,
+                              size: 19, color: Color(0xFFC62828)),
+                          onPressed: () => _remove(t),
                         ),
-                      ]),
+                      ])),
+                    ]),
+                  ),
           ),
         ],
       ),

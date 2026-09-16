@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSports, useRealtimeTable } from '../lib/hooks'
+import { attendanceWindow } from '../lib/dates'
 import { PageHead, Section, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
@@ -52,18 +53,8 @@ export default function Reports() {
     setTeamsSportData([...tm.entries()].map(([name, value]) => ({ name, value })))
 
     const rows = (att.data as AttRow[]) ?? []
-    const byDay = new Map<string, { present: number; total: number }>()
-    for (const r of rows) {
-      const e = byDay.get(r.date) ?? { present: 0, total: 0 }
-      e.total += 1
-      if (r.status === 'Present' || r.status === 'Late') e.present += 1
-      byDay.set(r.date, e)
-    }
     setAttData(
-      [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, e]) => ({
-        day: new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        present: e.total ? Math.round((e.present / e.total) * 100) : 0,
-      })),
+      attendanceWindow(rows, 30).map((p) => ({ day: p.label, present: p.pct })),
     )
     setAwards((aw.data as unknown as AwardRow[]) ?? [])
     setLoading(false)
@@ -95,11 +86,11 @@ export default function Reports() {
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
-                <Pie data={sportData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={3}>
+                <Pie data={sportData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {sportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
+                <Legend iconSize={9} wrapperStyle={{ fontSize: 11.5 }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -111,30 +102,44 @@ export default function Reports() {
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
-                <Pie data={teamsSportData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={3}>
+                <Pie data={teamsSportData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {teamsSportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
+                <Legend iconSize={9} wrapperStyle={{ fontSize: 11.5 }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </Section>
 
         <Section title="Attendance Rate - Last 30 Days (%)">
-          {attData.length === 0 ? (
-            <EmptyState text="No attendance data yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={attData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
-                <XAxis dataKey="day" stroke={palette.textMuted} fontSize={11} tickLine={false} />
-                <YAxis stroke={palette.textMuted} fontSize={11} domain={[0, 100]} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: palette.black, fontWeight: 700 }} />
-                <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={attData} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={palette.border} vertical={false} />
+              <XAxis
+                dataKey="day"
+                stroke={palette.textMuted}
+                fontSize={10}
+                tickLine={false}
+                // Every 5th day labeled — fixed ticks, no random skipping.
+                interval={4}
+                angle={-35}
+                textAnchor="end"
+                height={50}
+                tickMargin={6}
+              />
+              <YAxis
+                stroke={palette.textMuted}
+                fontSize={11}
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickLine={false}
+                tickFormatter={(v: number) => `${v}%`}
+              />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: palette.black, fontWeight: 700 }} formatter={(v) => [`${v}%`, 'Attendance']} />
+              <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} maxBarSize={14} />
+            </BarChart>
+          </ResponsiveContainer>
         </Section>
       </Box>
 

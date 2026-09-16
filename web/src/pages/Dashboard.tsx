@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSports, useRealtimeTable } from '../lib/hooks'
+import { attendanceWindow } from '../lib/dates'
 import { StatCard, Section, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
@@ -101,20 +102,8 @@ export default function Dashboard() {
       // "not cleared" = any record not cleared; approximated by unique athletes here
       setNotCleared(new Set(medRows.filter((r) => !r.cleared).map((r) => r.athlete_id)).size)
       const attRows = (att.data ?? []) as { date: string; status: string }[]
-      const byDay = new Map<string, { present: number; total: number }>()
-      for (const r of attRows) {
-        const e = byDay.get(r.date) ?? { present: 0, total: 0 }
-        e.total += 1
-        if (r.status === 'Present' || r.status === 'Late') e.present += 1
-        byDay.set(r.date, e)
-      }
       setAttendance(
-        [...byDay.entries()]
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([date, e]) => ({
-            day: new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-            present: e.total ? Math.round((e.present / e.total) * 100) : 0,
-          })),
+        attendanceWindow(attRows, 7).map((p) => ({ day: p.label, present: p.pct })),
       )
       setLoading(false)
     }
@@ -222,9 +211,18 @@ export default function Dashboard() {
             <EmptyState text="No teams yet." />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={teamsBySport} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
-                <XAxis type="number" stroke={palette.textMuted} fontSize={11} tickLine={false} allowDecimals={false} />
+              <BarChart data={teamsBySport} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
+                <XAxis
+                  type="number"
+                  stroke={palette.textMuted}
+                  fontSize={11}
+                  tickLine={false}
+                  allowDecimals={false}
+                  // Scale to the data with one step of headroom so the longest
+                  // bar never touches the edge.
+                  domain={[0, (max: number) => Math.ceil(max + 1)]}
+                />
                 <YAxis type="category" dataKey="name" stroke={palette.textMuted} fontSize={11} width={130} tickLine={false} />
                 <RTooltip
                   contentStyle={{
@@ -242,27 +240,41 @@ export default function Dashboard() {
         </Section>
 
         <Section title="Attendance - Last 7 Days (%)">
-          {attendance.length === 0 ? (
-            <EmptyState text="No attendance recorded yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={attendance}>
-                <CartesianGrid strokeDasharray="3 3" stroke={palette.border} />
-                <XAxis dataKey="day" stroke={palette.textMuted} fontSize={12} tickLine={false} />
-                <YAxis stroke={palette.textMuted} fontSize={12} domain={[0, 100]} tickLine={false} />
-                <RTooltip
-                  contentStyle={{
-                    background: palette.surface,
-                    border: `1px solid ${palette.border}`,
-                    borderRadius: 10,
-                    fontFamily: 'Lato, sans-serif',
-                  }}
-                  labelStyle={{ color: palette.black, fontWeight: 700 }}
-                />
-                <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={attendance} margin={{ left: -14, right: 8, top: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={palette.border} vertical={false} />
+              <XAxis
+                dataKey="day"
+                stroke={palette.textMuted}
+                fontSize={10.5}
+                tickLine={false}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={52}
+                tickMargin={6}
+              />
+              <YAxis
+                stroke={palette.textMuted}
+                fontSize={11}
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickLine={false}
+                tickFormatter={(v: number) => `${v}%`}
+              />
+              <RTooltip
+                contentStyle={{
+                  background: palette.surface,
+                  border: `1px solid ${palette.border}`,
+                  borderRadius: 10,
+                  fontFamily: 'Lato, sans-serif',
+                }}
+                labelStyle={{ color: palette.black, fontWeight: 700 }}
+                formatter={(v) => [`${v}%`, 'Attendance']}
+              />
+              <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} barSize={18} maxBarSize={22} />
+            </BarChart>
+          </ResponsiveContainer>
         </Section>
 
         <Section title="Latest Payroll">

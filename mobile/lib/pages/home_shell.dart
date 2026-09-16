@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/sports.dart';
@@ -9,6 +10,7 @@ import 'attendance_admin_page.dart';
 import 'coaches_page.dart';
 import 'crud_page.dart';
 import 'notifications_page.dart';
+import 'profile_page.dart';
 import 'inventory_page.dart';
 import 'matches_admin_page.dart';
 import 'purchases_page.dart';
@@ -41,12 +43,15 @@ const _navSections = <_NavSection>[
     _NavItem('Dashboard', Icons.dashboard_outlined, _dashboard, ),
     _NavItem('Reports', Icons.bar_chart_outlined, _reports),
   ]),
+  _NavSection('My Account', [
+    _NavItem('My Profile', Icons.account_circle_outlined, _profilePage),
+    _NavItem('User Management', Icons.manage_accounts_outlined, _users, roles: ['Admin']),
+  ]),
   _NavSection('People', [
-    _NavItem('Athletes', Icons.groups_outlined, _athletes),
-    _NavItem('Coaches', Icons.sports_outlined, _coaches),
+    _NavItem('Athletes', Icons.groups_outlined, _athletes, roles: ['Admin', 'Coach', 'HR']),
+    _NavItem('Coaches', Icons.sports_outlined, _coaches, roles: ['Admin', 'HR']),
     _NavItem('Teams', Icons.shield_outlined, _teams),
     _NavItem('Staff & HR', Icons.badge_outlined, _staff, roles: ['Admin', 'HR']),
-    _NavItem('User Management', Icons.manage_accounts_outlined, _users, roles: ['Admin']),
   ]),
   _NavSection('Competitions', [
     _NavItem('Tournaments', Icons.emoji_events_outlined, _tournaments),
@@ -56,26 +61,31 @@ const _navSections = <_NavSection>[
   _NavSection('Operations', [
     _NavItem('Attendance & Leave', Icons.fact_check_outlined, _attendance),
     _NavItem('Inventory', Icons.inventory_2_outlined, _inventory),
-    _NavItem('Housekeeping', Icons.cleaning_services_outlined, _housekeeping),
-    _NavItem('Vendors & Purchases', Icons.shopping_cart_outlined, _purchases),
+    _NavItem('Housekeeping', Icons.cleaning_services_outlined, _housekeeping,
+        roles: ['Admin', 'VenueManager']),
+    _NavItem('Vendors & Purchases', Icons.shopping_cart_outlined, _purchases,
+        roles: ['Admin', 'Finance', 'HR']),
     _NavItem('Finance & Expenses', Icons.payments_outlined, _expenses,
         roles: ['Admin', 'Finance', 'HR']),
   ]),
   _NavSection('Programs & Logistics', [
-    _NavItem('Training & Camps', Icons.fitness_center_outlined, _training),
-    _NavItem('School Activities', Icons.school_outlined, _activities),
+    _NavItem('Training & Camps', Icons.fitness_center_outlined, _training, roles: ['Admin', 'Coach']),
+    _NavItem('School Activities', Icons.school_outlined, _activities, roles: ['Admin', 'Coach']),
     _NavItem('Events', Icons.event_outlined, _events),
-    _NavItem('Transport', Icons.directions_bus_outlined, _transport),
-    _NavItem('Accommodation', Icons.hotel_outlined, _accommodation),
+    _NavItem('Transport', Icons.directions_bus_outlined, _transport,
+        roles: ['Admin', 'VenueManager', 'Coach']),
+    _NavItem('Accommodation', Icons.hotel_outlined, _accommodation,
+        roles: ['Admin', 'VenueManager', 'Coach']),
   ]),
   _NavSection('Athlete Care', [
-    _NavItem('Performance', Icons.speed_outlined, _performance),
-    _NavItem('Medical', Icons.medical_services_outlined, _medical),
+    _NavItem('Performance', Icons.speed_outlined, _performance, roles: ['Admin', 'Coach']),
+    _NavItem('Medical', Icons.medical_services_outlined, _medical, roles: ['Admin', 'Coach', 'HR']),
   ]),
 ];
 
 Widget _dashboard() => const DashboardHome();
 Widget _reports() => const ReportsPage();
+Widget _profilePage() => const ProfilePage();
 Widget _athletes() => const AthletesPage();
 Widget _coaches() => const CoachesPage();
 Widget _teams() => const TeamsPage();
@@ -97,6 +107,12 @@ Widget _accommodation() => modulePages()[6]();
 Widget _performance() => modulePages()[2]();
 Widget _medical() => modulePages()[3]();
 
+/// Session-scoped prefs holder (set once at login, shared by the shell).
+SharedPreferences? _prefsHolder;
+Future<void> initShellPrefs() async {
+  _prefsHolder = await SharedPreferences.getInstance();
+}
+
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -109,6 +125,8 @@ class _HomeShellState extends State<HomeShell> {
   String _current = 'Dashboard';
   List<_NavSection> _sections = const [];
   final Map<String, Widget> _pageCache = {};
+
+  static const _kPrefKey = 'sportsphere.nav.last';
 
   Widget _pageFor(String label) {
     return _pageCache.putIfAbsent(label, () {
@@ -146,20 +164,39 @@ class _HomeShellState extends State<HomeShell> {
           ),
       ];
     });
+    // Restore the last section this user opened (survives app restarts).
+    final saved = _prefs?.getString(_kPrefKey);
+    if (saved != null && _sections.expand((s) => s.items).any((i) => i.label == saved)) {
+      setState(() => _current = saved);
+    }
   }
+
+  SharedPreferences? get _prefs => _prefsHolder;
 
   Future<void> _signOut() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
+    _prefs?.remove(_kPrefKey);
     Navigator.of(context, rootNavigator: true).pushReplacement(
       MaterialPageRoute(builder: (_) => const SplashPage()),
     );
   }
 
+  /// Every allowed page, in stable order — mounted once inside an
+  /// IndexedStack so all of them fetch their data at startup (no "loading
+  /// after I tap something") and realtime keeps them fresh while hidden.
+  List<Widget> get _allPages {
+    final labels = _sections.expand((s) => s.items).map((i) => i.label).toList();
+    return [for (final l in labels) _pageFor(l)];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasSelected = _sections.expand((s) => s.items).any((i) => i.label == _current);
-    final body = hasSelected ? _pageFor(_current) : const DashboardHome();
+    final items = _sections.expand((s) => s.items).toList();
+    final hasSelected = items.any((i) => i.label == _current);
+    final currentLabel = hasSelected ? _current : 'Dashboard';
+    final currentIndex =
+        items.indexWhere((i) => i.label == currentLabel).clamp(0, items.isEmpty ? 0 : items.length - 1);
 
     return Scaffold(
       drawer: Drawer(
@@ -208,6 +245,8 @@ class _HomeShellState extends State<HomeShell> {
                             borderRadius: BorderRadius.circular(10),
                             onTap: () {
                               setState(() => _current = item.label);
+                              // Remember the user's choice across sessions.
+                              _prefs?.setString(_kPrefKey, item.label);
                               Navigator.pop(context);
                             },
                             child: Container(
@@ -282,7 +321,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ),
       appBar: AppBar(
-        title: Text(_current),
+        title: Text(currentLabel),
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
@@ -299,7 +338,12 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: body,
+      body: items.isEmpty
+          ? const LoadingState()
+          : IndexedStack(
+              index: currentIndex,
+              children: _allPages,
+            ),
     );
   }
 }
@@ -327,7 +371,6 @@ class _DashboardHomeState extends State<DashboardHome> {
   List<DbRow> _teamRows = [];
   List<({String day, num pct})> _attendance = [];
   List<DbRow> _payroll = [];
-  List<DbRow> _awards = [];
   List<DbRow> _equip = [];
   List<DbRow> _med = [];
   int _pendingPO = 0;
@@ -386,11 +429,6 @@ class _DashboardHomeState extends State<DashboardHome> {
         else
           Future.value(null),
         c.from('payroll').select('id, month, net, staff(profile:profiles(full_name))').order('month', ascending: false).limit(6),
-        c
-            .from('awards')
-            .select('id, title, level, date, athletes(profile:profiles(full_name))')
-            .order('date', ascending: false)
-            .limit(6),
         c.from('inventory_items').select('id, name, quantity, min_stock, condition'),
         c.from('purchase_orders').select('id, status'),
         c
@@ -401,16 +439,14 @@ class _DashboardHomeState extends State<DashboardHome> {
       ]);
       if (!mounted) return;
 
-      final attRows = (results[5] as List).cast<DbRow>();
-      final byDay = <String, List<int>>{};
-      for (final r in attRows) {
-        final day = '${r['date']}'.split('T').first;
-        final e = byDay.putIfAbsent(day, () => [0, 0]);
-        e[1] += 1;
-        final s = '${r['status']}';
-        if (s == 'Present' || s == 'Late') e[0] += 1;
-      }
-      final days = byDay.keys.toList()..sort();
+      // Shared rolling 7-day window (same algorithm as web lib/dates.ts).
+      final window = attendanceWindow(
+        (results[5] as List)
+            .cast<DbRow>()
+            .map((r) => (date: '${r['date']}', status: '${r['status']}'))
+            .toList(),
+        7,
+      );
       final profile = results[6] as DbRow?;
 
       setState(() {
@@ -420,23 +456,16 @@ class _DashboardHomeState extends State<DashboardHome> {
         _teams = _teamRows.length;
         _tournaments = (results[3] as List).length;
         _matches = (results[4] as List).cast<DbRow>();
-        _attendance = [
-          for (final d in days)
-            (
-              day: '${int.parse(d.split('-')[2])} ${months[int.parse(d.split('-')[1]) - 1]}',
-              pct: byDay[d]![1] == 0 ? 0 : (byDay[d]![0] * 100 ~/ byDay[d]![1]),
-            ),
-        ];
+        _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
         _name = '${profile?['full_name'] ?? ''}';
         _role = '${profile?['role'] ?? ''}';
         _payroll = (results[7] as List).cast<DbRow>();
-        _awards = (results[8] as List).cast<DbRow>();
-        _equip = (results[9] as List).cast<DbRow>();
-        _pendingPO = (results[10] as List)
+        _equip = (results[8] as List).cast<DbRow>();
+        _pendingPO = (results[9] as List)
             .cast<DbRow>()
             .where((r) => r['status'] == 'Ordered')
             .length;
-        _med = (results[11] as List).cast<DbRow>();
+        _med = (results[10] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {
@@ -537,7 +566,11 @@ class _DashboardHomeState extends State<DashboardHome> {
           const SizedBox(height: 16),
           _Card(
             title: 'Attendance - Last 7 Days (%)',
-            child: VBars([for (final a in _attendance) MapEntry(a.day, a.pct)]),
+            child: VBars(
+              [for (final a in _attendance) DayPoint('', a.day, 0, 0, a.pct.toInt())],
+              barWidth: 24,
+              height: 175,
+            ),
           ),
           const SizedBox(height: 16),
           _Card(
@@ -562,54 +595,6 @@ class _DashboardHomeState extends State<DashboardHome> {
                               const SizedBox(width: 6),
                               Text(inr(_toNum(p['net'])),
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 16),
-          _Card(
-            title: 'Recent Awards',
-            child: _awards.isEmpty
-                ? const EmptyState('No awards recorded yet.')
-                : Column(
-                    children: [
-                      const Row(children: [
-                        Expanded(flex: 3, child: Text('ATHLETE', style: dashHeadStyle)),
-                        Expanded(flex: 4, child: Text('AWARD', style: dashHeadStyle)),
-                        Expanded(flex: 2, child: Text('LEVEL', style: dashHeadStyle)),
-                        Expanded(flex: 2, child: Text('DATE', style: dashHeadStyle)),
-                      ]),
-                      const SizedBox(height: 6),
-                      for (final a in _awards)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                    ((((a['athletes'] ?? {}) as Map)['profile'] ?? {})['full_name'] ?? '-').toString(),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12.5)),
-                              ),
-                              Expanded(
-                                flex: 4,
-                                child: Text('${a['title']}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: BadgeChip('${a['level'] ?? '-'}',
-                                    color: levelColor('${a['level'] ?? ''}')),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(fmtDate(a['date']?.toString()),
-                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
-                              ),
                             ],
                           ),
                         ),

@@ -30,6 +30,8 @@ import SwapVertIcon from '@mui/icons-material/SwapVert'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState, StatCard } from '../components/ui'
+import ExpandableRow from '../components/ExpandableRow'
+import { inr, inrCompact } from '../lib/format'
 import dataTableSx from '../components/tableSx'
 
 type Item = {
@@ -107,7 +109,7 @@ export default function Inventory() {
 
   const lowStock = useMemo(() => rows.filter((r) => (r.quantity ?? 0) <= (r.min_stock ?? 0)), [rows])
   const totalValue = useMemo(() => rows.reduce((s, r) => s + (r.quantity ?? 0) * (r.unit_cost ?? 0), 0), [rows])
-  const inr = (n: number) => `Rs ${Math.round(n).toLocaleString('en-IN')}`
+  // inr() imported from lib/format (shared)
 
   function openAdd() {
     setEditing(null)
@@ -195,7 +197,7 @@ export default function Inventory() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
         <StatCard label="Items" value={rows.length} sub={`${rows.reduce((s, r) => s + (r.quantity ?? 0), 0)} units in stock`} />
         <StatCard label="Low stock" value={lowStock.length} sub="At or below minimum level" />
-        <StatCard label="Estimated value" value={inr(totalValue)} sub="Quantity x unit cost" />
+        <StatCard label="Estimated value" value={inrCompact(totalValue)} sub="Quantity x unit cost" />
       </Box>
 
       {lowStock.length > 0 && tab === 0 && (
@@ -245,16 +247,17 @@ export default function Inventory() {
                 <TableContainer sx={dataTableSx}>
                   <Table size="small">
                     <TableHead>
-                      <TableRow>
-                        <TableCell>Item</TableCell>
-                        <TableCell>Category</TableCell>
-                        <TableCell>Stock</TableCell>
-                        <TableCell>Level</TableCell>
-                        <TableCell>Condition</TableCell>
-                        <TableCell>Location</TableCell>
-                        <TableCell>Assigned team</TableCell>
-                        <TableCell align="right">Actions</TableCell>
-                      </TableRow>
+                    <TableRow>
+                      <TableCell padding="checkbox" sx={{ width: 40 }} />
+                      <TableCell>Item</TableCell>
+                      <TableCell>Category</TableCell>
+                      <TableCell>Stock</TableCell>
+                      <TableCell>Level</TableCell>
+                      <TableCell>Condition</TableCell>
+                      <TableCell>Location</TableCell>
+                      <TableCell>Assigned team</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
                     </TableHead>
                     <TableBody>
                       {filtered
@@ -265,20 +268,36 @@ export default function Inventory() {
                           const pct = min > 0 ? Math.min(100, Math.round((qty / (min * 2)) * 100)) : 100
                           const low = qty <= min
                           return (
-                            <TableRow key={r.id} hover>
-                              <TableCell>
+                            <ExpandableRow
+                              key={r.id}
+                              chips={[
+                                { label: low ? 'Low stock' : 'Healthy stock', color: low ? 'warning' : 'success' },
+                                { label: `Stock value ${inr(qty * Number(r.unit_cost ?? 0))}`, color: 'primary' },
+                              ]}
+                              detail={[
+                                { k: 'Item', v: r.name },
+                                { k: 'Category', v: r.category ?? '-' },
+                                { k: 'Stock', v: `${qty} ${r.unit ?? ''} (min ${min})` },
+                                { k: 'Condition', v: r.condition ?? '-' },
+                                { k: 'Location', v: r.location ?? '-' },
+                                { k: 'Assigned team', v: r.teams?.name ?? '-' },
+                                { k: 'Unit cost', v: inr(r.unit_cost ?? 0) },
+                                { k: 'Total value', v: inr(qty * Number(r.unit_cost ?? 0)) },
+                              ]}
+                            >
+                              <TableCell onClick={(e) => e.stopPropagation()}>
                                 <Typography sx={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</Typography>
                                 {r.unit && <Typography variant="caption" sx={{ color: 'text.secondary' }}>unit cost {inr(r.unit_cost ?? 0)}</Typography>}
                               </TableCell>
-                              <TableCell sx={{ color: 'text.secondary' }}>{r.category ?? '-'}</TableCell>
-                              <TableCell sx={{ fontWeight: 700, color: low ? 'warning.main' : undefined }}>{qty} {r.unit ?? ''}</TableCell>
-                              <TableCell sx={{ width: 120 }}>
+                              <TableCell onClick={(e) => e.stopPropagation()} sx={{ color: 'text.secondary' }}>{r.category ?? '-'}</TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} sx={{ fontWeight: 700, color: low ? 'warning.main' : undefined }}>{qty} {r.unit ?? ''}</TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} sx={{ width: 120 }}>
                                 <LinearProgress variant="determinate" value={pct} color={low ? 'warning' : 'success'} sx={{ height: 6, borderRadius: 3 }} />
                               </TableCell>
-                              <TableCell><Badge color={statusColor(r.condition === 'Good' || r.condition === 'New' ? 'Active' : r.condition === 'Worn' ? 'Late' : 'Maintenance')}>{r.condition ?? '-'}</Badge></TableCell>
-                              <TableCell sx={{ color: 'text.secondary' }}>{r.location ?? '-'}</TableCell>
-                              <TableCell sx={{ color: 'text.secondary' }}>{r.teams?.name ?? '-'}</TableCell>
-                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                              <TableCell onClick={(e) => e.stopPropagation()}><Badge color={statusColor(r.condition === 'Good' || r.condition === 'New' ? 'Active' : r.condition === 'Worn' ? 'Late' : 'Maintenance')}>{r.condition ?? '-'}</Badge></TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} sx={{ color: 'text.secondary' }}>{r.location ?? '-'}</TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} sx={{ color: 'text.secondary' }}>{r.teams?.name ?? '-'}</TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                                 <IconButton size="small" color="primary" onClick={() => { setMoveFor(r); setMoveType('IN'); setMoveQty(''); setMoveNote('') }} aria-label="Stock movement">
                                   <SwapVertIcon fontSize="small" />
                                 </IconButton>
@@ -289,7 +308,7 @@ export default function Inventory() {
                                   <DeleteOutlinedIcon fontSize="small" />
                                 </IconButton>
                               </TableCell>
-                            </TableRow>
+                            </ExpandableRow>
                           )
                         })}
                     </TableBody>

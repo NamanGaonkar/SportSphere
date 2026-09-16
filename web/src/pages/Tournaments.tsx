@@ -199,8 +199,8 @@ export default function Tournaments() {
                 {['School', 'District', 'State', 'National'].map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
               </TextField>
               <SportSelect value={form.sport_id} onChange={(v) => setForm({ ...form, sport_id: v })} emptyLabel="No sport" />
-              <TextField type="date" label="Start date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-              <TextField type="date" label="End date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField type="date" label="Start date" value={form.start_date} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: new Date().toISOString().slice(0, 10) } }} onChange={(e) => setForm({ ...form, start_date: e.target.value })} fullWidth />
+              <TextField type="date" label="End date" value={form.end_date} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: form.start_date || new Date().toISOString().slice(0, 10) } }} onChange={(e) => setForm({ ...form, end_date: e.target.value })} fullWidth />
               <TextField select label="Venue" value={form.venue_id} onChange={(e) => setForm({ ...form, venue_id: e.target.value })} fullWidth>
                 <MenuItem value="">None</MenuItem>
                 {venues.map((v) => <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>)}

@@ -142,15 +142,30 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          PageHead('Attendance & Leave',
-              sub: 'Mark daily attendance for athletes and staff.',
-              action: DateField(
-                label: 'Date',
-                value: _date,
-                onChanged: (v) => setState(() => _date = v ?? _date),
-              )),
+          // Title and date picker are separate rows — the date field never
+          // squeezes/overflows the header on narrow screens.
+          const PageHead('Attendance & Leave',
+              sub: 'Mark daily attendance for athletes and staff.'),
+          Row(
+            children: [
+              const Text('Date',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: DateField(
+                    label: 'Pick date',
+                    value: _date,
+                    onChanged: (v) => setState(() => _date = v ?? _date),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           LayoutBuilder(builder: (context, constraints) {
-            const gap = 16.0;
+            const gap = 12.0;
             final w = (constraints.maxWidth - gap) / 2;
             return Wrap(
               spacing: gap,
@@ -203,12 +218,17 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('${r['full_name'] ?? '-'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     Text('${r['role'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               if (status != null)
                 Tooltip(
                   message: reason ?? '',
@@ -221,24 +241,31 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          // Status buttons stretch evenly across the row — no wrapping,
+          // no vertical stretching, fixed compact height.
+          Row(
             children: [
-              for (final st in _statuses)
-                SizedBox(
-                  height: 32,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      backgroundColor: status == st ? Brand.primary : Colors.transparent,
-                      foregroundColor: status == st ? Colors.white : Brand.primary,
-                      side: BorderSide(color: status == st ? Brand.primary : Brand.primary.withValues(alpha: 0.5)),
+              for (var i = 0; i < _statuses.length; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: SizedBox(
+                    height: 34,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        backgroundColor: status == _statuses[i] ? Brand.primary : Colors.transparent,
+                        foregroundColor: status == _statuses[i] ? Colors.white : Brand.primary,
+                        side: BorderSide(
+                            color: status == _statuses[i]
+                                ? Brand.primary
+                                : Brand.primary.withValues(alpha: 0.5)),
+                      ),
+                      onPressed: _saving ? null : () => _onMark(r, _statuses[i]),
+                      child: Text(_statuses[i], style: const TextStyle(fontSize: 12)),
                     ),
-                    onPressed: _saving ? null : () => _onMark(r, st),
-                    child: Text(st, style: const TextStyle(fontSize: 12.5)),
                   ),
                 ),
+              ],
             ],
           ),
           const Divider(height: 18),
