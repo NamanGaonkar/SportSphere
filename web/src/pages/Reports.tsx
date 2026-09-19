@@ -44,7 +44,7 @@ function SnapshotStat({ label, value, sub }: { label: string; value: number | st
 export default function Reports() {
   const [sportData, setSportData] = useState<{ name: string; value: number }[]>([])
   const [teamsSportData, setTeamsSportData] = useState<{ name: string; value: number }[]>([])
-  const [attData, setAttData] = useState<{ day: string; present: number }[]>([])
+  const [attData, setAttData] = useState<{ day: string; present: number | null }[]>([])
   const [awards, setAwards] = useState<AwardRow[]>([])
   const [loading, setLoading] = useState(true)
   const { byId } = useSports()
@@ -74,7 +74,8 @@ export default function Reports() {
 
     const rows = (att.data as AttRow[]) ?? []
     setAttData(
-      attendanceWindow(rows, 30).map((p) => ({ day: p.label, present: p.pct })),
+      // Unmarked days are gaps (null), not 0% — mirrors Dashboard.tsx.
+      attendanceWindow(rows, 30).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
     )
     setAwards((aw.data as unknown as AwardRow[]) ?? [])
     setLoading(false)
@@ -171,16 +172,17 @@ export default function Reports() {
               label="Athlete entries"
               value={sportData.reduce((s, d) => s + d.value, 0)}
               sub="Athlete-sport registrations"
-            />
-            <SnapshotStat
-              label="Avg attendance"
-              value={
-                attData.length
-                  ? `${Math.round(attData.reduce((s, d) => s + d.present, 0) / attData.length)}%`
-                  : '0%'
-              }
-              sub="30-day average"
-            />
+            />              <SnapshotStat
+                label="Avg attendance"
+                value={(() => {
+                  // Average only over days that actually have marks.
+                  const marked = attData.filter((d) => d.present != null)
+                  return marked.length
+                    ? `${Math.round(marked.reduce((s, d) => s + (d.present ?? 0), 0) / marked.length)}%`
+                    : '0%'
+                })()}
+                sub="30-day average"
+              />
           </Box>
         </Section>
       </Box>

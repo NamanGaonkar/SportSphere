@@ -51,7 +51,7 @@ type MedRow = { id: string; athlete_id: string; type: string; cleared: boolean; 
 export default function Dashboard() {
   const [counts, setCounts] = useState<Counts>({ athletes: 0, coaches: 0, teams: 0, tournaments: 0 })
   const [matches, setMatches] = useState<MatchRow[]>([])
-  const [attendance, setAttendance] = useState<{ day: string; present: number }[]>([])
+  const [attendance, setAttendance] = useState<{ day: string; present: number | null }[]>([])
   const [teamSports, setTeamSports] = useState<{ id: string; sport_id: string | null }[]>([])
   const [payroll, setPayroll] = useState<PayrollRow[]>([])
   const [awards, setAwards] = useState<AwardRow[]>([])
@@ -104,7 +104,9 @@ export default function Dashboard() {
       setNotCleared(new Set(medRows.filter((r) => !r.cleared).map((r) => r.athlete_id)).size)
       const attRows = (att.data ?? []) as { date: string; status: string }[]
       setAttendance(
-        attendanceWindow(attRows, 7).map((p) => ({ day: p.label, present: p.pct })),
+        // Days with no marks at all render as null -> an empty gap, never 0%
+        // or 100%, so one Present mark cannot distort the chart.
+        attendanceWindow(attRows, 7).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
       )
       setLoading(false)
     }

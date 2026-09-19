@@ -8,7 +8,7 @@
  * x-axis never shifts shape when data is sparse.
  */
 
-export type DayPoint = { key: string; label: string; present: number; total: number; pct: number }
+export type DayPoint = { key: string; label: string; present: number; total: number; pct: number; marked?: boolean }
 
 /** yyyy-mm-dd in LOCAL time (what `date` columns contain). */
 export function localDateKey(d: Date): string {
@@ -51,12 +51,16 @@ export function attendanceWindow(
   }
   return keys.map((k) => {
     const b = buckets.get(k)!
+    // Days with no marks at all are excluded from the rate (total stays for
+    // display) — so marking one person Present can never show "100%".
+    const pct = b.total === 0 ? 0 : Math.round((b.present / b.total) * 100)
     return {
       key: k,
       label: shortDayLabel(k),
       present: b.present,
       total: b.total,
-      pct: b.total === 0 ? 0 : Math.round((b.present / b.total) * 100),
+      pct,
+      marked: b.total > 0,
     }
   })
 }

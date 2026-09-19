@@ -76,7 +76,10 @@ class DayPoint {
   final int present;
   final int total;
   final int pct;
-  const DayPoint(this.key, this.label, this.present, this.total, this.pct);
+  /// False = nobody was marked that day. Charts render these days as gaps,
+  /// never as 0% or 100% (so one Present mark can't distort the rate).
+  final bool marked;
+  const DayPoint(this.key, this.label, this.present, this.total, this.pct, {this.marked = true});
 }
 
 /// Rolling N-day window ending today. Every day gets a bucket even when
@@ -107,6 +110,7 @@ List<DayPoint> attendanceWindow(List<({String date, String status})> rows, int d
         buckets[k]![0],
         buckets[k]![1],
         buckets[k]![1] == 0 ? 0 : (buckets[k]![0] * 100 ~/ buckets[k]![1]),
+        marked: buckets[k]![1] > 0,
       ),
   ];
 }
@@ -860,22 +864,26 @@ class VBars extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text('${p.pct}%',
+                      Text(p.marked ? '${p.pct}%' : '-',
                           style: const TextStyle(
                               fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black54)),
                       const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
-                          width: barWidth,
-                          // pct/100 * plotH — true percentage scale.
-                          height: (p.pct / 100) * plotH,
-                          decoration: const BoxDecoration(
-                            color: Brand.primary,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+                      if (p.marked)
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            width: barWidth,
+                            // pct/100 * plotH — true percentage scale.
+                            height: (p.pct / 100) * plotH,
+                            decoration: const BoxDecoration(
+                              color: Brand.primary,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+                            ),
                           ),
-                        ),
-                      ),
+                        )
+                      else
+                        // Unmarked day: a small dash, never a bar.
+                        Container(width: barWidth, height: 2, color: Colors.black12),
                       const SizedBox(height: 5),
                       Text(p.label,
                           overflow: TextOverflow.clip,
