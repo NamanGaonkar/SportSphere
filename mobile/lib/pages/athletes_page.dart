@@ -40,7 +40,7 @@ class _AthletesPageState extends State<AthletesPage> {
       final results = await Future.wait<dynamic>([
         client
             .from('athletes')
-            .select('*, profile:profiles(id, full_name, contact_info), teams(name), athlete_sports(sports(name))')
+            .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(name), athlete_sports(sports(name))')
             .order('created_at'),
         client.from('teams').select('id, name').order('name'),
       ]);
@@ -122,8 +122,32 @@ class _AthletesPageState extends State<AthletesPage> {
                     ],
                     rowBuilder: (r) {
                       final medical = r['medical_notes']?.toString() ?? '';
+                      final fullName = '${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}';
+                      final avatarUrl = ((r['profile'] ?? {}) as Map)['avatar_url']?.toString();
                       return DataRow(cells: [
-                        DataCell(Text('${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}')),
+                        DataCell(Row(
+                          children: [
+                            // Uploaded profile photo with initial fallback —
+                            // same data the web table shows.
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundImage:
+                                  (avatarUrl?.isNotEmpty ?? false) ? NetworkImage(avatarUrl!) : null,
+                              backgroundColor: const Color(0x2EFF6A13),
+                              child: (avatarUrl?.isNotEmpty ?? false)
+                                  ? null
+                                  : Text(fullName.isNotEmpty ? fullName[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                          fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB25A1F))),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(fullName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        )),
                         DataCell(Text(_sportNames(r))),
                         DataCell(Text('${((r['teams'] ?? {}) as Map)['name'] ?? '-'}')),
                         DataCell(Text('${_age(r['dob']) ?? '-'}')),

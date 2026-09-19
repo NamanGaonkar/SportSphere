@@ -221,6 +221,9 @@ export default function Dashboard() {
                   data={teamsBySport}
                   layout="vertical"
                   margin={{ left: 4, right: 36, top: 4, bottom: 4 }}
+                  // Bar bands align with the Y-axis ticks only when the axis
+                  // padding matches on both ends.
+                  barCategoryGap="22%"
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
                   <XAxis
@@ -243,10 +246,12 @@ export default function Dashboard() {
                     width={190}
                     interval={0}
                     tickLine={false}
+                    tickMargin={6}
                     // Scale bar band to fill the plot height evenly.
                     scale="band"
                   />
                   <RTooltip
+                    cursor={{ fill: 'rgba(255,106,19,0.08)' }}
                     contentStyle={{
                       background: palette.surface,
                       border: `1px solid ${palette.border}`,
@@ -254,9 +259,13 @@ export default function Dashboard() {
                       fontFamily: 'Lato, sans-serif',
                     }}
                     labelStyle={{ color: palette.black, fontWeight: 700 }}
+                    // "count : 4" reads wrong — the payload name is the series
+                    // key, so give it a proper label.
+                    formatter={(value) => [`${value} team${Number(value) === 1 ? '' : 's'}`, 'Teams']}
                   />
                   <Bar
                     dataKey="teams"
+                    name="Teams"
                     fill={palette.primary}
                     radius={[0, 6, 6, 0]}
                     // Fill the band dynamically instead of a fixed 16px bar:

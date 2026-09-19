@@ -22,6 +22,7 @@ import AddIcon from '@mui/icons-material/Add'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
+import Avatar from '@mui/material/Avatar'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
 import { SportMultiSelect } from '../components/SportSelect'
@@ -34,7 +35,7 @@ type Athlete = {
   dob: string | null
   medical_notes: string | null
   profile_id: string
-  profile: { id: string; full_name: string; contact_info: string | null } | null
+  profile: { id: string; full_name: string; contact_info: string | null; avatar_url: string | null } | null
   teams: { name: string } | null
   athlete_sports: { sports: { name: string } | null }[] | null
 }
@@ -59,7 +60,7 @@ export default function Athletes() {
     const [ath, tm] = await Promise.all([
       supabase
         .from('athletes')
-        .select('*, profile:profiles(id, full_name, contact_info), teams(name), athlete_sports(sports(name))')
+        .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(name), athlete_sports(sports(name))')
         .order('created_at'),
       supabase.from('teams').select('id, name').order('name'),
     ])
@@ -222,7 +223,17 @@ export default function Athletes() {
                           { k: 'Medical notes', v: r.medical_notes || '-' },
                         ]}
                       >
-                        <TableCell onClick={(e) => e.stopPropagation()}>{r.profile?.full_name ?? '-'}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                            <Avatar
+                              src={r.profile?.avatar_url ?? undefined}
+                              sx={{ width: 30, height: 30, fontSize: 13, bgcolor: 'rgba(255,106,19,0.18)', color: '#B25A1F', fontWeight: 700 }}
+                            >
+                              {(r.profile?.full_name ?? '?').slice(0, 1).toUpperCase()}
+                            </Avatar>
+                            {r.profile?.full_name ?? '-'}
+                          </Box>
+                        </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>{sportNames(r)}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>{r.teams?.name ?? '-'}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>{age(r.dob) ?? '-'}</TableCell>

@@ -29,7 +29,7 @@ class _CoachesPageState extends State<CoachesPage> {
     try {
       final data = await client
           .from('coaches')
-          .select('*, profile:profiles(id, full_name, contact_info), teams(id, name)')
+          .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(id, name)')
           .order('created_at');
       if (!mounted) return;
       setState(() {
@@ -126,8 +126,31 @@ class _CoachesPageState extends State<CoachesPage> {
                       ];
                     },
                     rowBuilder: (r) {
+                      final fullName = '${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}';
+                      final avatarUrl = ((r['profile'] ?? {}) as Map)['avatar_url']?.toString();
                       return DataRow(cells: [
-                        DataCell(Text('${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}')),
+                        DataCell(Row(
+                          children: [
+                            // Uploaded profile photo with initial fallback.
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundImage:
+                                  (avatarUrl?.isNotEmpty ?? false) ? NetworkImage(avatarUrl!) : null,
+                              backgroundColor: const Color(0x2EFF6A13),
+                              child: (avatarUrl?.isNotEmpty ?? false)
+                                  ? null
+                                  : Text(fullName.isNotEmpty ? fullName[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                          fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB25A1F))),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(fullName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        )),
                         DataCell(Text('${r['specialization'] ?? '-'}')),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(

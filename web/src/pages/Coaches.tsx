@@ -6,6 +6,7 @@ import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
 import Typography from '@mui/material/Typography'
+import Avatar from '@mui/material/Avatar'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -35,7 +36,7 @@ type Coach = {
   sport_id: string | null
   certification: string | null
   experience_years: number | null
-  profile: { id: string; full_name: string; contact_info: string | null } | null
+  profile: { id: string; full_name: string; contact_info: string | null; avatar_url: string | null } | null
   teams: { id: string; name: string }[] | null
 }
 
@@ -67,7 +68,7 @@ export default function Coaches() {
     setLoading(true)
     const { data } = await supabase
       .from('coaches')
-      .select('*, profile:profiles(id, full_name, contact_info), teams(id, name)')
+      .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(id, name)')
       .order('created_at')
     setRows((data as unknown as Coach[]) ?? [])
     setLoading(false)
@@ -188,7 +189,17 @@ export default function Coaches() {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((r) => (
                       <TableRow key={r.id} hover>
-                        <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                            <Avatar
+                              src={r.profile?.avatar_url ?? undefined}
+                              sx={{ width: 30, height: 30, fontSize: 13, bgcolor: 'rgba(255,106,19,0.18)', color: '#B25A1F', fontWeight: 700 }}
+                            >
+                              {(r.profile?.full_name ?? '?').slice(0, 1).toUpperCase()}
+                            </Avatar>
+                            {r.profile?.full_name ?? '-'}
+                          </Box>
+                        </TableCell>
                         <TableCell>{r.specialization ?? '-'}</TableCell>
                         <TableCell>{r.sport_id ? (sportName.get(r.sport_id) ?? '-') : '-'}</TableCell>
                         <TableCell>{r.experience_years != null ? `${r.experience_years} yrs` : '-'}</TableCell>
