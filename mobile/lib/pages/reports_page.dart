@@ -57,6 +57,8 @@ class _ReportsPageState extends State<ReportsPage> {
             .from('attendance')
             .select('date, status')
             .gte('date', DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T').first),
+        // Roster denominator so sparse days can't read as 100% (same as web).
+        client.from('profiles').select('id').inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
         client
             .from('awards')
             .select('id, title, level, date, athletes(profile:profiles(full_name))')
@@ -77,19 +79,21 @@ class _ReportsPageState extends State<ReportsPage> {
         tm[key] = (tm[key] ?? 0) + 1;
       }
       // Shared rolling 30-day window (same algorithm as web lib/dates.ts).
+      // Rate is against the full roster so 1 mark can never read as 100%.
       final window = attendanceWindow(
         (results[2] as List)
             .cast<DbRow>()
             .map((r) => (date: '${r['date']}', status: '${r['status']}'))
             .toList(),
         30,
+        roster: (results[4] as List).length,
       );
 
       setState(() {
         _athleteSports = am.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _teamSports = tm.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
-        _awards = (results[3] as List).cast<DbRow>();
+        _awards = (results[5] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {

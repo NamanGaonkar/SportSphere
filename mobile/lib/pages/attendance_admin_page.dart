@@ -64,7 +64,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     return null;
   }
 
-  ({int present, int total}) get _summary {
+  ({int present, int total, int pct}) get _summary {
     var present = 0, total = 0;
     for (final r in _rows) {
       final s = _recordFor(r)?['status'];
@@ -73,7 +73,10 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         if (s == 'Present' || s == 'Late') present += 1;
       }
     }
-    return (present: present, total: total);
+    // Rate over the whole roster, not just those marked so far —
+    // 1 Present out of 16 people reads as ~6%, not 100%.
+    final pct = _rows.isEmpty ? 0 : (present * 100 / _rows.length).round();
+    return (present: present, total: total, pct: pct);
   }
 
   Future<void> _mark(DbRow r, String status, {String? leaveReason}) async {
@@ -185,7 +188,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   child: StatCard(
                       label: 'PRESENT + LATE',
                       value: '${s.present}',
-                      sub: '${s.total == 0 ? 0 : (s.present * 100 ~/ s.total)}% attendance'),
+                      sub: '${s.pct}% of ${_rows.length} people'),
                 ),
               ],
             );

@@ -85,7 +85,9 @@ class DayPoint {
 /// Rolling N-day window ending today. Every day gets a bucket even when
 /// empty, so the x-axis is always the same shape. Identical algorithm to
 /// web/src/lib/dates.ts — the graphs on phone and web always agree.
-List<DayPoint> attendanceWindow(List<({String date, String status})> rows, int days) {
+/// [roster] = total people expected to attend; when given, pct is computed
+/// against the roster (1 Present out of 16 people reads as ~6%, not 100%).
+List<DayPoint> attendanceWindow(List<({String date, String status})> rows, int days, {int? roster}) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final buckets = <String, List<int>>{}; // key -> [present, total]
@@ -109,7 +111,12 @@ List<DayPoint> attendanceWindow(List<({String date, String status})> rows, int d
         shortDayLabel(k),
         buckets[k]![0],
         buckets[k]![1],
-        buckets[k]![1] == 0 ? 0 : (buckets[k]![0] * 100 ~/ buckets[k]![1]),
+        (roster != null && roster > 0
+                ? buckets[k]![0] * 100 / roster
+                : buckets[k]![1] == 0
+                    ? 0.0
+                    : buckets[k]![0] * 100 / buckets[k]![1])
+            .round(),
         marked: buckets[k]![1] > 0,
       ),
   ];

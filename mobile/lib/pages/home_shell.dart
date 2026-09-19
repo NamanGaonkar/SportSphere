@@ -447,6 +447,8 @@ class _DashboardHomeState extends State<DashboardHome> {
             .from('attendance')
             .select('date, status')
             .gte('date', DateTime.now().subtract(const Duration(days: 7)).toIso8601String().split('T').first),
+        // Roster = everyone attendance applies to (same as web).
+        c.from('profiles').select('id').inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
         if (uid != null)
           c.from('profiles').select('full_name, role').eq('id', uid).maybeSingle()
         else
@@ -463,12 +465,14 @@ class _DashboardHomeState extends State<DashboardHome> {
       if (!mounted) return;
 
       // Shared rolling 7-day window (same algorithm as web lib/dates.ts).
+      // Rate is against the full roster so 1 mark can never read as 100%.
       final window = attendanceWindow(
         (results[5] as List)
             .cast<DbRow>()
             .map((r) => (date: '${r['date']}', status: '${r['status']}'))
             .toList(),
         7,
+        roster: (results[12] as List).length,
       );
       final profile = results[6] as DbRow?;
 
@@ -482,13 +486,13 @@ class _DashboardHomeState extends State<DashboardHome> {
         _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
         _name = '${profile?['full_name'] ?? ''}';
         _role = '${profile?['role'] ?? ''}';
-        _payroll = (results[7] as List).cast<DbRow>();
-        _equip = (results[8] as List).cast<DbRow>();
-        _pendingPO = (results[9] as List)
+        _payroll = (results[8] as List).cast<DbRow>();
+        _equip = (results[9] as List).cast<DbRow>();
+        _pendingPO = (results[10] as List)
             .cast<DbRow>()
             .where((r) => r['status'] == 'Ordered')
             .length;
-        _med = (results[10] as List).cast<DbRow>();
+        _med = (results[12] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {

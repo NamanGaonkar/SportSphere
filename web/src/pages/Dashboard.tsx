@@ -65,7 +65,7 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     {
-      const [ath, coa, tea, tou, mat, att, tsp, pay, aw, eq, po, medq] = await Promise.all([
+      const [ath, coa, tea, tou, mat, att, roster, tsp, pay, aw, eq, po, medq] = await Promise.all([
         supabase.from('athletes').select('id', { count: 'exact', head: true }),
         supabase.from('coaches').select('id', { count: 'exact', head: true }),
         supabase.from('teams').select('id', { count: 'exact', head: true }),
@@ -76,6 +76,8 @@ export default function Dashboard() {
           .order('scheduled_at', { ascending: false })
           .limit(6),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+        // Roster = everyone attendance applies to (athletes + coaches + staff roles).
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
         supabase.from('teams').select('id, sport_id'),
         supabase.from('payroll').select('id, month, net, staff_id, coach_id, staff:staff_id(profile:profiles(full_name)), coach:coach_id(profile:profiles(full_name))').order('month', { ascending: false }).limit(6),
         supabase.from('awards').select('id, title, date, level, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(6),
@@ -104,9 +106,9 @@ export default function Dashboard() {
       setNotCleared(new Set(medRows.filter((r) => !r.cleared).map((r) => r.athlete_id)).size)
       const attRows = (att.data ?? []) as { date: string; status: string }[]
       setAttendance(
-        // Days with no marks at all render as null -> an empty gap, never 0%
-        // or 100%, so one Present mark cannot distort the chart.
-        attendanceWindow(attRows, 7).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
+        // Rate is computed against the full roster: 1 Present out of 16
+        // people reads as ~6%, not 100%. Unmarked days render as gaps.
+        attendanceWindow(attRows, 7, roster.count ?? 0).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
       )
       setLoading(false)
     }

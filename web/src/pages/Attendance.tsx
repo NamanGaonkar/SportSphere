@@ -82,7 +82,9 @@ export default function Attendance() {
       const s = statusFor(r)
       if (s) { total += 1; if (s === 'Present' || s === 'Late') present += 1 }
     }
-    return { present, total, pct: total ? Math.round((present / total) * 100) : 0 }
+    // Rate is over the whole roster (all listed people), not just those
+    // marked so far — 1 Present out of 16 people reads as ~6%, not 100%.
+    return { present, total, pct: rows.length ? Math.round((present / rows.length) * 100) : 0 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, date])
 
@@ -137,7 +139,7 @@ export default function Attendance() {
         }}
       >
         <StatCard label="Marked" value={summary.total} sub={`of ${rows.length} athletes`} />
-        <StatCard label="Present + Late" value={summary.present} sub={`${summary.pct}% attendance`} />
+        <StatCard label="Present + Late" value={summary.present} sub={`${summary.pct}% of ${rows.length} people`} />
       </Box>
 
       <Paper>

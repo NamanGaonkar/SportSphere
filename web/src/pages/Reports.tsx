@@ -51,11 +51,13 @@ export default function Reports() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [ajs, tms, att, aw] = await Promise.all([
+    const [ajs, tms, att, aw, rosterQ] = await Promise.all([
       supabase.from('athlete_sports').select('sports(name)'),
       supabase.from('teams').select('sport_id'),
       supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)),
       supabase.from('awards').select('*, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(8),
+      // Roster denominator so sparse days can't read as 100%.
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
     ])
     // Athletes by sport: one entry per athlete-sport tag (multi-sport aware).
     const m = new Map<string, number>()
@@ -74,8 +76,8 @@ export default function Reports() {
 
     const rows = (att.data as AttRow[]) ?? []
     setAttData(
-      // Unmarked days are gaps (null), not 0% — mirrors Dashboard.tsx.
-      attendanceWindow(rows, 30).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
+      // Rate against the full roster; unmarked days are gaps (null).
+      attendanceWindow(rows, 30, rosterQ.count ?? 0).map((p) => ({ day: p.label, present: p.marked === false ? (null as unknown as number) : p.pct })),
     )
     setAwards((aw.data as unknown as AwardRow[]) ?? [])
     setLoading(false)

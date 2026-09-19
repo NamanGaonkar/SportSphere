@@ -28,10 +28,14 @@ export function shortDayLabel(key: string): string {
 /**
  * Build the rolling N-day window and fold attendance rows into it.
  * rows: { date: 'yyyy-mm-dd', status: string } (extra fields fine).
+ * roster: total people expected to attend (profiles in attendance roles).
+ * When provided, pct = present / roster — so marking one person can never
+ * read as 100%; the rate only fills up as more of the roster is marked.
  */
 export function attendanceWindow(
   rows: { date: string; status: string }[],
   days: 7 | 30,
+  roster?: number,
 ): DayPoint[] {
   const today = new Date()
   const buckets = new Map<string, { present: number; total: number }>()
@@ -51,9 +55,11 @@ export function attendanceWindow(
   }
   return keys.map((k) => {
     const b = buckets.get(k)!
-    // Days with no marks at all are excluded from the rate (total stays for
-    // display) — so marking one person Present can never show "100%".
-    const pct = b.total === 0 ? 0 : Math.round((b.present / b.total) * 100)
+    // With a roster denominator the rate is honest: 1 Present out of 16
+    // people reads as ~6%, not 100%. Days with no marks at all are still
+    // flagged unmarked so charts can render them as gaps.
+    const denom = roster && roster > 0 ? roster : b.total
+    const pct = denom === 0 ? 0 : Math.round((b.present / denom) * 100)
     return {
       key: k,
       label: shortDayLabel(k),
