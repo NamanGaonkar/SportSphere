@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/sports.dart';
 import '../widgets/common.dart';
 import 'crud_page.dart' show DbRow;
 
@@ -82,6 +83,7 @@ class _CoachesPageState extends State<CoachesPage> {
                     columns: const [
                       DataColumn(label: Text('Name')),
                       DataColumn(label: Text('Specialization')),
+                      DataColumn(label: Text('Sport')),
                       DataColumn(label: Text('Teams')),
                       DataColumn(label: Text('Actions')),
                     ],
@@ -90,6 +92,7 @@ class _CoachesPageState extends State<CoachesPage> {
                       return DataRow(cells: [
                         DataCell(Text('${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}')),
                         DataCell(Text('${r['specialization'] ?? '-'}')),
+                        DataCell(Text(SportsCache.instance.name(r['sport_id']?.toString()))),
                         DataCell(Text(
                             teams.isEmpty ? '-' : teams.map((t) => (t as Map)['name']).join(', '))),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
@@ -116,11 +119,15 @@ class _CoachesPageState extends State<CoachesPage> {
   Future<void> _showForm(DbRow? editing) async {
     final nameCtrl = TextEditingController(text: '${((editing?['profile'] ?? {}) as Map)['full_name'] ?? ''}');
     final specCtrl = TextEditingController(text: '${editing?['specialization'] ?? ''}');
+    final certCtrl = TextEditingController(text: '${editing?['certification'] ?? ''}');
+    final expCtrl = TextEditingController(text: '${editing?['experience_years'] ?? ''}');
+    String? sportId = editing?['sport_id']?.toString();
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-      builder: (ctx) => Padding(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -134,6 +141,22 @@ class _CoachesPageState extends State<CoachesPage> {
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full name')),
               const SizedBox(height: 14),
               TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Specialization')),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: (sportId?.isEmpty ?? true) ? null : sportId,
+                decoration: const InputDecoration(labelText: 'Sport'),
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('None')),
+                  for (final s in SportsCache.instance.rows)
+                    DropdownMenuItem(value: s['id'] as String, child: Text('${s['name']}')),
+                ],
+                onChanged: (v) => setModal(() => sportId = v),
+              ),
+              const SizedBox(height: 14),
+              TextField(controller: certCtrl, decoration: const InputDecoration(labelText: 'Certification')),
+              const SizedBox(height: 14),
+              TextField(controller: expCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Experience (years)')),
               const SizedBox(height: 20),
               Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
@@ -149,25 +172,27 @@ class _CoachesPageState extends State<CoachesPage> {
           ),
         ),
       ),
+      ),
     );
     if (ok != true) return;
     final name = nameCtrl.text.trim();
     final spec = specCtrl.text.trim();
+    final payload = <String, dynamic>{
+      'specialization': spec.isEmpty ? null : spec,
+      'sport_id': (sportId?.isEmpty ?? true) ? null : sportId,
+      'certification': certCtrl.text.trim().isEmpty ? null : certCtrl.text.trim(),
+      'experience_years': expCtrl.text.trim().isEmpty ? null : num.tryParse(expCtrl.text.trim()),
+    };
     try {
       if (editing != null) {
         final profileId = ((editing['profile'] ?? {}) as Map)['id'];
         if (profileId != null) {
           await client.from('profiles').update({'full_name': name}).eq('id', profileId);
         }
-        await client
-            .from('coaches')
-            .update({'specialization': spec.isEmpty ? null : spec}).eq('id', editing['id']);
+        await client.from('coaches').update(payload).eq('id', editing['id']);
       } else {
         final profile = await client.from('profiles').insert({'full_name': name, 'role': 'Coach'}).select('id').single();
-        await client.from('coaches').insert({
-          'profile_id': profile['id'],
-          'specialization': spec.isEmpty ? null : spec,
-        });
+        await client.from('coaches').insert({'profile_id': profile['id'], ...payload});
       }
       _load();
     } catch (e) {

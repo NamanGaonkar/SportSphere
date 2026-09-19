@@ -23,10 +23,12 @@ type Venue = {
   location: string | null
   capacity: number | null
   status: string
+  indoor_outdoor: string | null
+  facility_details: string | null
   venue_bookings: { count: number }[] | null
 }
 
-const empty = { name: '', location: '', capacity: '', status: 'Active' }
+const empty = { name: '', location: '', capacity: '', status: 'Active', indoor_outdoor: 'Outdoor', facility_details: '' }
 
 export default function Venues() {
   const [rows, setRows] = useState<Venue[]>([])
@@ -56,6 +58,8 @@ export default function Venues() {
       location: form.location || null,
       capacity: form.capacity ? Number(form.capacity) : null,
       status: form.status,
+      indoor_outdoor: form.indoor_outdoor,
+      facility_details: form.facility_details || null,
     }
     const { error } = editing
       ? await supabase.from('venues').update(payload).eq('id', editing)
@@ -75,7 +79,14 @@ export default function Venues() {
 
   function openEdit(v: Venue) {
     setEditing(v.id)
-    setForm({ name: v.name, location: v.location ?? '', capacity: v.capacity?.toString() ?? '', status: v.status })
+    setForm({
+      name: v.name,
+      location: v.location ?? '',
+      capacity: v.capacity?.toString() ?? '',
+      status: v.status,
+      indoor_outdoor: v.indoor_outdoor ?? 'Outdoor',
+      facility_details: v.facility_details ?? '',
+    })
     setShowForm(true)
   }
 
@@ -113,6 +124,14 @@ export default function Venues() {
               <Typography variant="body2" sx={{ mt: 1 }}>
                 Capacity: {v.capacity?.toLocaleString() ?? '-'} - Bookings: {v.venue_bookings?.[0]?.count ?? 0}
               </Typography>
+              <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Badge color={v.indoor_outdoor === 'Indoor' ? 'info' : 'success'}>{v.indoor_outdoor ?? 'Outdoor'}</Badge>
+                {v.facility_details && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
+                    {v.facility_details}
+                  </Typography>
+                )}
+              </Box>
               <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                 <IconButton size="small" onClick={() => openEdit(v)} aria-label="Edit">
                   <EditOutlinedIcon fontSize="small" />
@@ -137,6 +156,10 @@ export default function Venues() {
               <TextField select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
                 {['Active', 'Maintenance', 'Closed'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </TextField>
+              <TextField select label="Indoor / Outdoor" value={form.indoor_outdoor} onChange={(e) => setForm({ ...form, indoor_outdoor: e.target.value })} fullWidth>
+                {['Indoor', 'Outdoor'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              </TextField>
+              <TextField label="Facility details" value={form.facility_details} onChange={(e) => setForm({ ...form, facility_details: e.target.value })} fullWidth />
             </Box>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>

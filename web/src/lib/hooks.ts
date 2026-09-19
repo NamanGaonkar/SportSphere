@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export type Sport = { id: string; name: string; icon: string | null }
+export type Sport = { id: string; name: string; icon: string | null; sport_type?: string | null; format?: string | null; indoor_outdoor?: string | null }
 
 let cache: Sport[] | null = null
 const listeners = new Set<(s: Sport[]) => void>()
@@ -17,14 +17,14 @@ supabase
   .subscribe()
 
 async function load(): Promise<Sport[]> {
-  const { data } = await supabase.from('sports').select('id, name, icon').order('name')
+  const { data } = await supabase.from('sports').select('id, name, icon, sport_type, format, indoor_outdoor').order('name')
   cache = (data as Sport[]) ?? []
   for (const fn of listeners) fn(cache)
   return cache
 }
 
 /** Live list of sports from the DB — single source of truth, never hardcoded. */
-export function useSports(): { sports: Sport[]; byId: (id: string | null | undefined) => string } {
+export function useSports(): { sports: Sport[]; byId: (id: string | null | undefined) => string; refresh: () => Promise<void> } {
   const [sports, setSports] = useState<Sport[]>(cache ?? [])
   useEffect(() => {
     listeners.add(setSports)
@@ -34,7 +34,8 @@ export function useSports(): { sports: Sport[]; byId: (id: string | null | undef
   }, [])
   const byId = (id: string | null | undefined) =>
     sports.find((s) => s.id === id)?.name ?? ''
-  return { sports, byId }
+  const refresh = async () => { await load() }
+  return { sports, byId, refresh }
 }
 
 /**

@@ -33,12 +33,13 @@ type Tournament = {
   start_date: string | null
   end_date: string | null
   sport_id: string | null
+  format: string | null
   sports: { name: string } | null
   venues: { name: string } | null
   matches: { count: number }[] | null
 }
 
-const empty = { name: '', level: 'School', sport_id: '', start_date: '', end_date: '', venue_id: '' }
+const empty = { name: '', level: 'School', sport_id: '', start_date: '', end_date: '', venue_id: '', format: 'Knockout' }
 
 const levelColor = (l: string) =>
   l === 'National' ? 'error' : l === 'State' ? 'warning' : l === 'District' ? 'info' : 'success'
@@ -86,6 +87,7 @@ export default function Tournaments() {
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       venue_id: form.venue_id || null,
+      format: form.format,
     }
     const { error } = editing
       ? await supabase.from('tournaments').update(payload).eq('id', editing)
@@ -112,6 +114,7 @@ export default function Tournaments() {
       start_date: t.start_date ?? '',
       end_date: t.end_date ?? '',
       venue_id: '',
+      format: t.format ?? 'Knockout',
     })
     setShowForm(true)
   }
@@ -197,6 +200,9 @@ export default function Tournaments() {
               <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
               <TextField select label="Level" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} fullWidth>
                 {['School', 'District', 'State', 'National'].map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+              </TextField>
+              <TextField select label="Format" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} fullWidth>
+                {['Knockout', 'League', 'League + Knockout', 'Points Table'].map((f) => <MenuItem key={f} value={f}>{f}</MenuItem>)}
               </TextField>
               <SportSelect value={form.sport_id} onChange={(v) => setForm({ ...form, sport_id: v })} emptyLabel="No sport" />
               <TextField type="date" label="Start date" value={form.start_date} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: new Date().toISOString().slice(0, 10) } }} onChange={(e) => setForm({ ...form, start_date: e.target.value })} fullWidth />

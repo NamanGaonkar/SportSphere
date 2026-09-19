@@ -9,6 +9,29 @@ const teamSource = { table: 'teams', select: 'id, name', labelPath: 'name' }
 const venueSource = { table: 'venues', select: 'id, name', labelPath: 'name' }
 const coachSource = { table: 'coaches', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
 const athleteSource = { table: 'athletes', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
+const staffSource = { table: 'staff', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
+
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+
+/** id -> label map for a source def (shared by columns across a page). */
+function useSourceOptions(source: { table: string; select: string; labelPath: string }): Map<string, string> {
+  const [map, setMap] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    let alive = true
+    supabase.from(source.table).select(source.select).then(({ data }) => {
+      if (!alive) return
+      const m = new Map<string, string>()
+      for (const r of ((data ?? []) as unknown as Record<string, unknown>[])) {
+        const label = source.labelPath.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], r)
+        m.set(String(r.id), label != null ? String(label) : '-')
+      }
+      setMap(m)
+    })
+    return () => { alive = false }
+  }, [source.table, source.select, source.labelPath])
+  return map
+}
 
 const statusCol = (key: string, label: string): ColumnDef => ({
   key,
@@ -23,21 +46,103 @@ const moneyCol = (key: string, label: string): ColumnDef => ({
 })
 
 export function Housekeeping() {
+  const venueOptions = useSourceOptions(venueSource)
   const fields: FieldDef[] = [
     { key: 'area', label: 'Area', required: true },
     { key: 'task', label: 'Task', required: true },
+    { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource },
     { key: 'assigned_to', label: 'Assigned to' },
     { key: 'scheduled_date', label: 'Scheduled date', type: 'date' },
+    { key: 'start_time', label: 'Start time', type: 'datetime-local' },
+    { key: 'end_time', label: 'End time', type: 'datetime-local' },
     { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Done'] },
+    { key: 'notes', label: 'Notes', type: 'textarea', fullWidth: true },
   ]
   const columns: ColumnDef[] = [
     { key: 'area', label: 'Area' },
     { key: 'task', label: 'Task' },
+    { key: 'venue_id', label: 'Venue', render: (r) => venueOptions.get(String(r.venue_id ?? '')) ?? '-' },
     { key: 'assigned_to', label: 'Assigned' },
     { key: 'scheduled_date', label: 'Date' },
     statusCol('status', 'Status'),
   ]
   return <CrudPage title="Housekeeping Management" sub="Cleaning and upkeep tasks across venues." table="housekeeping_tasks" columns={columns} fields={fields} searchKeys={['area', 'task', 'assigned_to']} />
+}
+
+export function VenueMaintenance() {
+  const venueOptions = useSourceOptions(venueSource)
+  const fields: FieldDef[] = [
+    { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource, required: true },
+    { key: 'issue_title', label: 'Issue', required: true },
+    { key: 'description', label: 'Description', type: 'textarea', fullWidth: true },
+    { key: 'assigned_to', label: 'Assigned staff' },
+    { key: 'reported_date', label: 'Reported date', type: 'date' },
+    { key: 'completed_date', label: 'Completed date', type: 'date' },
+    { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High'] },
+    { key: 'cost', label: 'Cost (INR)', type: 'number' },
+    { key: 'status', label: 'Status', type: 'select', options: ['Reported', 'In Progress', 'On Hold', 'Completed'] },
+  ]
+  const columns: ColumnDef[] = [
+    { key: 'venue_id', label: 'Venue', render: (r) => venueOptions.get(String(r.venue_id ?? '')) ?? '-' },
+    { key: 'issue_title', label: 'Issue' },
+    { key: 'assigned_to', label: 'Assigned' },
+    { key: 'reported_date', label: 'Reported' },
+    { key: 'priority', label: 'Priority', render: (r) => <Badge color={r.priority === 'High' ? 'error' : r.priority === 'Low' ? 'default' : 'warning'}>{String(r.priority ?? 'Medium')}</Badge> },
+    moneyCol('cost', 'Cost'),
+    statusCol('status', 'Status'),
+  ]
+  return <CrudPage title="Venue Maintenance" sub="Issues, assigned staff, status and repair costs per venue." table="venue_maintenance" orderBy="reported_date" columns={columns} fields={fields} searchKeys={['issue_title', 'description', 'assigned_to']} />
+}
+
+export function PayrollPage() {
+  const staffOptions = useSourceOptions(staffSource)
+  const coachOptions = useSourceOptions(coachSource)
+  const fields: FieldDef[] = [
+    { key: 'staff_id', label: 'Staff member', type: 'select', source: staffSource },
+    { key: 'coach_id', label: 'Coach', type: 'select', source: coachSource },
+    { key: 'month', label: 'Pay month', type: 'date', required: true },
+    { key: 'pay_period', label: 'Pay period', type: 'select', options: ['Monthly', 'Bi-weekly', 'Weekly'] },
+    { key: 'gross', label: 'Base salary (INR)', type: 'number', required: true },
+    { key: 'allowances', label: 'Allowances (INR)', type: 'number' },
+    { key: 'bonus', label: 'Bonus (INR)', type: 'number' },
+    { key: 'deductions', label: 'Deductions (INR)', type: 'number' },
+    { key: 'payment_method', label: 'Payment method', type: 'select', options: ['Bank Transfer', 'UPI', 'Cheque', 'Cash'] },
+    { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Paid', 'On Hold'] },
+    { key: 'paid_on', label: 'Paid on', type: 'date' },
+    { key: 'remarks', label: 'Remarks', type: 'textarea', fullWidth: true },
+  ]
+  const columns: ColumnDef[] = [
+    { key: 'staff_id', label: 'Payee', render: (r) => staffOptions.get(String(r.staff_id ?? '')) ?? coachOptions.get(String(r.coach_id ?? '')) ?? '-' },
+    { key: 'month', label: 'Month', render: (r) => (r.month ? new Date(String(r.month) + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '-') },
+    moneyCol('gross', 'Base'),
+    moneyCol('allowances', 'Allow.'),
+    moneyCol('bonus', 'Bonus'),
+    moneyCol('deductions', 'Deduct.'),
+    moneyCol('net', 'Net (auto)'),
+    { key: 'status', label: 'Status', render: (r) => <Badge color={r.status === 'Paid' ? 'success' : r.status === 'On Hold' ? 'warning' : 'default'}>{String(r.status ?? 'Pending')}</Badge> },
+  ]
+  return <CrudPage title="Payroll" sub="Salaries for staff and coaches: allowances, bonus, deductions. Net is computed automatically." table="payroll" orderBy="month" columns={columns} fields={fields} searchKeys={['remarks']} />
+}
+
+export function VenueBookings() {
+  const venueOptions = useSourceOptions(venueSource)
+  const fields: FieldDef[] = [
+    { key: 'title', label: 'Title' },
+    { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource, required: true },
+    { key: 'start_time', label: 'Starts', type: 'datetime-local', required: true },
+    { key: 'end_time', label: 'Ends', type: 'datetime-local', required: true },
+    { key: 'purpose', label: 'Purpose', required: true },
+    { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Confirmed', 'Cancelled', 'Rejected'] },
+  ]
+  const columns: ColumnDef[] = [
+    { key: 'title', label: 'Title', render: (r) => String(r.title ?? r.purpose ?? '-') },
+    { key: 'venue_id', label: 'Venue', render: (r) => venueOptions.get(String(r.venue_id ?? '')) ?? '-' },
+    { key: 'start_time', label: 'From', render: (r) => (r.start_time ? new Date(String(r.start_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-') },
+    { key: 'end_time', label: 'To', render: (r) => (r.end_time ? new Date(String(r.end_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-') },
+    { key: 'purpose', label: 'Purpose' },
+    { key: 'status', label: 'Status', render: (r) => <Badge color={statusColor(String(r.status ?? ''))}>{String(r.status ?? '-')}</Badge> },
+  ]
+  return <CrudPage title="Venue Booking" sub="Booking workflow with availability checks - overlapping bookings are rejected automatically." table="venue_bookings" orderBy="start_time" columns={columns} fields={fields} searchKeys={['purpose', 'title']} />
 }
 
 export function Training() {

@@ -48,6 +48,7 @@ class ColumnDef {
 
 // ---- shared sources (same tables as web modules.tsx) ----
 const sportSource = SourceDef('sports', 'id, name', 'name');
+const staffSource = SourceDef('staff', 'id, profile:profiles(full_name)', 'profile.full_name');
 const teamSource = SourceDef('teams', 'id, name', 'name');
 const venueSource = SourceDef('venues', 'id, name', 'name');
 const coachSource = SourceDef('coaches', 'id, profile:profiles(full_name)', 'profile.full_name');
@@ -74,6 +75,7 @@ List<Widget Function()> modulePages() {
         columns: [
           ColumnDef('area', 'Area'),
           ColumnDef('task', 'Task'),
+          ColumnDef('venue_id', 'Venue', render: (r) => _srcText('venues', r['venue_id'])),
           ColumnDef('assigned_to', 'Assigned'),
           ColumnDef('scheduled_date', 'Date', render: (r) => Text(fmtDate(r['scheduled_date']?.toString()))),
           ColumnDef('status', 'Status',
@@ -82,9 +84,105 @@ List<Widget Function()> modulePages() {
         fields: const [
           FieldDef('area', 'Area', required: true),
           FieldDef('task', 'Task', required: true),
+          FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource),
           FieldDef('assigned_to', 'Assigned to'),
           FieldDef('scheduled_date', 'Scheduled date', type: FType.date),
+          FieldDef('start_time', 'Start time', type: FType.datetime),
+          FieldDef('end_time', 'End time', type: FType.datetime),
           FieldDef('status', 'Status', type: FType.select, options: ['Pending', 'In Progress', 'Done']),
+          FieldDef('notes', 'Notes', type: FType.textarea, fullWidth: true),
+        ],
+      );
+
+  Widget maintenance() => CrudList(
+        title: 'Venue Maintenance',
+        sub: 'Issues, assigned staff, status and repair costs per venue.',
+        table: 'venue_maintenance',
+        orderBy: 'reported_date',
+        searchKeys: const ['issue_title', 'description', 'assigned_to'],
+        columns: [
+          ColumnDef('venue_id', 'Venue', render: (r) => _srcText('venues', r['venue_id'])),
+          ColumnDef('issue_title', 'Issue'),
+          ColumnDef('assigned_to', 'Assigned'),
+          ColumnDef('reported_date', 'Reported', render: (r) => Text(fmtDate(r['reported_date']?.toString()))),
+          ColumnDef('priority', 'Priority', render: (r) {
+            final p = '${r['priority'] ?? 'Medium'}';
+            return BadgeChip(p, color: p == 'High' ? const Color(0xFFC62828) : p == 'Low' ? const Color(0xFF616161) : const Color(0xFFB26A00));
+          }),
+          ColumnDef('cost', 'Cost', render: (r) => Text(inr(_num(r['cost'])))),
+          ColumnDef('status', 'Status',
+              render: (r) => BadgeChip((r['status'] ?? '-').toString(), color: statusColor(r['status']?.toString() ?? ''))),
+        ],
+        fields: const [
+          FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource, required: true),
+          FieldDef('issue_title', 'Issue', required: true),
+          FieldDef('description', 'Description', type: FType.textarea, fullWidth: true),
+          FieldDef('assigned_to', 'Assigned staff'),
+          FieldDef('reported_date', 'Reported date', type: FType.date),
+          FieldDef('completed_date', 'Completed date', type: FType.date),
+          FieldDef('priority', 'Priority', type: FType.select, options: ['Low', 'Medium', 'High']),
+          FieldDef('cost', 'Cost (INR)', type: FType.number),
+          FieldDef('status', 'Status', type: FType.select, options: ['Reported', 'In Progress', 'On Hold', 'Completed']),
+        ],
+      );
+
+  Widget payroll() => CrudList(
+        title: 'Payroll',
+        sub: 'Salaries for staff and coaches. Net is computed automatically.',
+        table: 'payroll',
+        orderBy: 'month',
+        searchKeys: const ['remarks'],
+        columns: [
+          ColumnDef('staff_id', 'Payee', render: (r) => r['staff_id'] != null ? _srcText('staff', r['staff_id']) : _srcText('coaches', r['coach_id'])),
+          ColumnDef('month', 'Month', render: (r) => Text(fmtDate(r['month']?.toString()))),
+          ColumnDef('gross', 'Base', render: (r) => Text(inr(_num(r['gross'])))),
+          ColumnDef('allowances', 'Allow.', render: (r) => Text(inr(_num(r['allowances'])))),
+          ColumnDef('bonus', 'Bonus', render: (r) => Text(inr(_num(r['bonus'])))),
+          ColumnDef('deductions', 'Deduct.', render: (r) => Text(inr(_num(r['deductions'])))),
+          ColumnDef('net', 'Net (auto)', render: (r) => Text(inr(_num(r['net'])), style: const TextStyle(fontWeight: FontWeight.w700))),
+          ColumnDef('status', 'Status', render: (r) {
+            final s = '${r['status'] ?? 'Pending'}';
+            return BadgeChip(s, color: s == 'Paid' ? const Color(0xFF2E7D32) : s == 'On Hold' ? const Color(0xFFB26A00) : const Color(0xFF616161));
+          }),
+        ],
+        fields: const [
+          FieldDef('staff_id', 'Staff member', type: FType.select, source: staffSource),
+          FieldDef('coach_id', 'Coach', type: FType.select, source: coachSource),
+          FieldDef('month', 'Pay month', type: FType.date, required: true),
+          FieldDef('pay_period', 'Pay period', type: FType.select, options: ['Monthly', 'Bi-weekly', 'Weekly']),
+          FieldDef('gross', 'Base salary (INR)', type: FType.number, required: true),
+          FieldDef('allowances', 'Allowances (INR)', type: FType.number),
+          FieldDef('bonus', 'Bonus (INR)', type: FType.number),
+          FieldDef('deductions', 'Deductions (INR)', type: FType.number),
+          FieldDef('payment_method', 'Payment method', type: FType.select, options: ['Bank Transfer', 'UPI', 'Cheque', 'Cash']),
+          FieldDef('status', 'Status', type: FType.select, options: ['Pending', 'Paid', 'On Hold']),
+          FieldDef('paid_on', 'Paid on', type: FType.date),
+          FieldDef('remarks', 'Remarks', type: FType.textarea, fullWidth: true),
+        ],
+      );
+
+  Widget bookings() => CrudList(
+        title: 'Venue Booking',
+        sub: 'Overlapping bookings are rejected automatically by the database.',
+        table: 'venue_bookings',
+        orderBy: 'start_time',
+        searchKeys: const ['purpose', 'title'],
+        columns: [
+          ColumnDef('title', 'Title', render: (r) => Text('${r['title'] ?? r['purpose'] ?? '-'}')),
+          ColumnDef('venue_id', 'Venue', render: (r) => _srcText('venues', r['venue_id'])),
+          ColumnDef('start_time', 'From', render: (r) => Text(fmtDateTime(r['start_time']?.toString()))),
+          ColumnDef('end_time', 'To', render: (r) => Text(fmtDateTime(r['end_time']?.toString()))),
+          ColumnDef('purpose', 'Purpose'),
+          ColumnDef('status', 'Status',
+              render: (r) => BadgeChip((r['status'] ?? '-').toString(), color: statusColor(r['status']?.toString() ?? ''))),
+        ],
+        fields: const [
+          FieldDef('title', 'Title'),
+          FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource, required: true),
+          FieldDef('start_time', 'Starts', type: FType.datetime, required: true),
+          FieldDef('end_time', 'Ends', type: FType.datetime, required: true),
+          FieldDef('purpose', 'Purpose', required: true),
+          FieldDef('status', 'Status', type: FType.select, options: ['Pending', 'Confirmed', 'Cancelled', 'Rejected']),
         ],
       );
 
@@ -295,6 +393,9 @@ List<Widget Function()> modulePages() {
     accommodation,
     expenses,
     activities,
+    maintenance,
+    payroll,
+    bookings,
   ];
 }
 

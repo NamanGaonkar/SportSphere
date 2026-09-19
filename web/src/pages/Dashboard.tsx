@@ -14,7 +14,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid, LabelList,
 } from 'recharts'
 import { palette } from '../theme'
 
@@ -210,12 +210,12 @@ export default function Dashboard() {
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
-            <Box sx={{ width: '100%', height: 260 }}>
+            <Box sx={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={teamsBySport}
                   layout="vertical"
-                  margin={{ left: 4, right: 28, top: 4, bottom: 4 }}
+                  margin={{ left: 4, right: 36, top: 4, bottom: 4 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
                   <XAxis
@@ -233,7 +233,7 @@ export default function Dashboard() {
                     dataKey="name"
                     stroke={palette.textMuted}
                     fontSize={11}
-                    width={130}
+                    width={150}
                     tickLine={false}
                     // Scale bar band to fill the plot height evenly.
                     scale="band"
@@ -247,7 +247,16 @@ export default function Dashboard() {
                     }}
                     labelStyle={{ color: palette.black, fontWeight: 700 }}
                   />
-                  <Bar dataKey="teams" fill={palette.primary} radius={[0, 6, 6, 0]} barSize={16} />
+                  <Bar
+                    dataKey="teams"
+                    fill={palette.primary}
+                    radius={[0, 6, 6, 0]}
+                    // Fill the band dynamically instead of a fixed 16px bar:
+                    // 2 sports and 16 sports both look proportionate.
+                    maxBarSize={26}
+                  >
+                    <LabelList dataKey="teams" position="right" fontSize={11} fill={palette.black} fontWeight={700} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </Box>

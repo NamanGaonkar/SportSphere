@@ -63,9 +63,14 @@ const _navSections = <_NavSection>[
     _NavItem('Inventory', Icons.inventory_2_outlined, _inventory),
     _NavItem('Housekeeping', Icons.cleaning_services_outlined, _housekeeping,
         roles: ['Admin', 'VenueManager']),
+    _NavItem('Venue Maintenance', Icons.build_outlined, _maintenance,
+        roles: ['Admin', 'VenueManager']),
+    _NavItem('Venue Booking', Icons.event_available_outlined, _bookings),
     _NavItem('Vendors & Purchases', Icons.shopping_cart_outlined, _purchases,
         roles: ['Admin', 'Finance', 'HR']),
-    _NavItem('Finance & Expenses', Icons.payments_outlined, _expenses,
+    _NavItem('Payroll', Icons.payments_outlined, _payroll,
+        roles: ['Admin', 'Finance', 'HR']),
+    _NavItem('Finance & Expenses', Icons.receipt_long_outlined, _expenses,
         roles: ['Admin', 'Finance', 'HR']),
   ]),
   _NavSection('Programs & Logistics', [
@@ -106,6 +111,9 @@ Widget _transport() => modulePages()[5]();
 Widget _accommodation() => modulePages()[6]();
 Widget _performance() => modulePages()[2]();
 Widget _medical() => modulePages()[3]();
+Widget _maintenance() => modulePages()[9]();
+Widget _payroll() => modulePages()[10]();
+Widget _bookings() => modulePages()[11]();
 
 /// Session-scoped prefs holder (set once at login, shared by the shell).
 SharedPreferences? _prefsHolder;

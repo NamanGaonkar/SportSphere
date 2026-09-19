@@ -7,11 +7,18 @@ import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
+import Tooltip from '@mui/material/Tooltip'
+import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
 import Button from '@mui/material/Button'
 import LinearProgress from '@mui/material/LinearProgress'
 import LogoutIcon from '@mui/icons-material/Logout'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import BuildIcon from '@mui/icons-material/Build'
+import BookingIcon from '@mui/icons-material/EventAvailable'
 import {
   Dashboard as DashboardIcon, BarChart as ReportsIcon,
   Groups as AthletesIcon, Sports as CoachesIcon, Shield as TeamsIcon,
@@ -45,6 +52,7 @@ import Reports from './pages/Reports'
 import {
   Housekeeping, Training, Performance, Medical,
   EventsPage, Transport, Accommodation, Expenses, Activities,
+  VenueMaintenance, PayrollPage, VenueBookings,
 } from './pages/modules'
 import Purchases from './pages/Purchases'
 import Users from './pages/Users'
@@ -106,7 +114,10 @@ const NAV_SECTIONS: {
       { to: '/attendance', label: 'Attendance & Leave', icon: AttendanceIcon },
       { to: '/inventory', label: 'Inventory', icon: InventoryIcon },
       { to: '/housekeeping', label: 'Housekeeping', icon: HousekeepingIcon, roles: ['Admin', 'VenueManager'] },
+      { to: '/maintenance', label: 'Venue Maintenance', icon: BuildIcon, roles: ['Admin', 'VenueManager'] },
+      { to: '/bookings', label: 'Venue Booking', icon: BookingIcon },
       { to: '/purchases', label: 'Vendors & Purchases', icon: PurchasesIcon, roles: ['Admin', 'Finance', 'HR'] },
+      { to: '/payroll', label: 'Payroll', icon: PaymentsIcon, roles: ['Admin', 'Finance', 'HR'] },
       { to: '/expenses', label: 'Finance & Expenses', icon: ExpensesIcon, roles: ['Admin', 'Finance', 'HR'] },
     ],
   },
@@ -141,6 +152,9 @@ export default function App() {
 
   const [session, setSession] = useState<Session>(null)
   const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sportsphere.nav.collapsed') === '1' } catch { return false }
+  })
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -207,45 +221,85 @@ export default function App() {
   }
 
   const role = session.profile?.role ?? 'Athlete'
-  const drawerWidth = 240
+  const expandedWidth = 248
+  const collapsedWidth = 76
+  const drawerWidth = collapsed ? collapsedWidth : expandedWidth
 
   return (
     <SessionContext.Provider value={session}>
-      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
         <Drawer
           variant="permanent"
           sx={{
             width: drawerWidth,
             flexShrink: 0,
             transition: (t) => t.transitions.create('width', { duration: 220 }),
+            // Floating rail: never touches any edge — inset from left/top/bottom.
             '& .MuiDrawer-paper': {
+              position: 'fixed',
+              top: 12,
+              left: 12,
+              bottom: 12,
+              height: 'auto',
               width: drawerWidth,
               boxSizing: 'border-box',
               bgcolor: 'common.black',
               color: 'common.white',
-              borderRight: 'none',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 4,
+              boxShadow: '0 12px 40px rgba(13,13,13,0.35)',
               transition: (t) => t.transitions.create('width', { duration: 220 }),
               overflowX: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 2 }}>
+          {/* Brand row + collapse toggle */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: collapsed ? 1.5 : 2.5, py: 2, flexShrink: 0 }}>
             <Box
               component="img"
               src="/logo.png"
               alt="SportSphere"
-              sx={{ width: 30, height: 34, objectFit: 'contain', flexShrink: 0 }}
+              sx={{ width: 30, height: 34, objectFit: 'contain', flexShrink: 0, mx: collapsed ? 'auto' : 0 }}
             />
-            <Typography sx={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.2 }} noWrap>
-              SportSphere
-            </Typography>
+            {!collapsed && (
+              <Typography sx={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.2, flex: 1 }} noWrap>
+                SportSphere
+              </Typography>
+            )}
+            <IconButton
+              size="small"
+              onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('sportsphere.nav.collapsed', collapsed ? '0' : '1') } catch { /* ignore */ } }}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              sx={{
+                color: 'rgba(255,255,255,0.6)',
+                display: collapsed ? 'none' : 'inline-flex',
+                '&:hover': { color: 'primary.main' },
+              }}
+            >
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
           </Box>
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+          {collapsed && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', pb: 1.5, flexShrink: 0 }}>
+              <IconButton
+                size="small"
+                onClick={() => { setCollapsed(false); try { localStorage.setItem('sportsphere.nav.collapsed', '0') } catch { /* ignore */ } }}
+                aria-label="Expand sidebar"
+                sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: 'primary.main' } }}
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          )}
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
           <Box
             sx={{
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
+              py: 0.5,
               // Normal scroll, invisible scrollbar
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
@@ -254,24 +308,27 @@ export default function App() {
           >
             {visibleSections.map((s) => (
               <List key={s.section} disablePadding>
-                <Typography
-                  sx={{
-                    px: 2.5,
-                    pt: 2,
-                    pb: 0.5,
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    letterSpacing: 1.2,
-                    textTransform: 'uppercase',
-                    color: 'rgba(255,255,255,0.45)',
-                  }}
-                >
-                  {s.section}
-                </Typography>
+                {!collapsed && (
+                  <Typography
+                    sx={{
+                      px: 2.5,
+                      pt: 2,
+                      pb: 0.5,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      letterSpacing: 1.2,
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.45)',
+                    }}
+                  >
+                    {s.section}
+                  </Typography>
+                )}
+                {collapsed && <Box sx={{ height: 10 }} />}
                 {s.items.map((i) => {
                   const active = location.pathname === i.to
                   const Icon = i.icon
-                  return (
+                  const item = (
                     <ListItemButton
                       key={i.to}
                       selected={active}
@@ -282,7 +339,8 @@ export default function App() {
                         borderRadius: 1.5,
                         py: 1,
                         minHeight: 42,
-                        px: 2,
+                        px: collapsed ? 1.25 : 2,
+                        justifyContent: collapsed ? 'center' : 'flex-start',
                         color: 'rgba(255,255,255,0.72)',
                         '&.Mui-selected': {
                           bgcolor: 'primary.main',
@@ -295,25 +353,38 @@ export default function App() {
                       <ListItemIcon sx={{ minWidth: 36, color: 'inherit', justifyContent: 'center' }}>
                         <Icon fontSize="small" />
                       </ListItemIcon>
-                      <ListItemText
-                        primary={i.label}
-                        slotProps={{
-                          primary: {
-                            sx: { fontSize: 13.5, fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' },
-                          },
-                        }}
-                      />
+                      {!collapsed && (
+                        <ListItemText
+                          primary={i.label}
+                          slotProps={{
+                            primary: {
+                              sx: { fontSize: 13.5, fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' },
+                            },
+                          }}
+                        />
+                      )}
                     </ListItemButton>
+                  )
+                  return collapsed ? (
+                    <Tooltip key={i.to} title={i.label} placement="right">
+                      {item}
+                    </Tooltip>
+                  ) : (
+                    item
                   )
                 })}
               </List>
             ))}
           </Box>
-          <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
-              {session.profile?.full_name ?? session.user.email}
-            </Typography>
-            <Typography sx={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', mb: 1 }}>{role}</Typography>
+          <Box sx={{ p: collapsed ? 1 : 2, borderTop: '1px solid rgba(255,255,255,0.12)', textAlign: 'left', flexShrink: 0 }}>
+            {!collapsed && (
+              <>
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
+                  {session.profile?.full_name ?? session.user.email}
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', mb: 1 }}>{role}</Typography>
+              </>
+            )}
             <Button
               fullWidth
               size="small"
@@ -325,16 +396,29 @@ export default function App() {
               sx={{
                 color: 'rgba(255,255,255,0.72)',
                 borderColor: 'rgba(255,255,255,0.25)',
+                minWidth: collapsed ? 0 : undefined,
+                px: collapsed ? 0 : undefined,
                 '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
               }}
               variant="outlined"
+              aria-label="Sign out"
             >
-              Sign out
+              {!collapsed && 'Sign out'}
             </Button>
           </Box>
         </Drawer>
 
-        <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, maxWidth: 1440, minWidth: 0 }}>
+        {/* Main content: offset by the floating rail (12px gap + rail width + 12px gap). */}
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            p: { xs: 2, md: 3 },
+            ml: `${drawerWidth + 24}px`,
+            width: `calc(100% - ${drawerWidth + 24}px)`,
+          }}
+        >
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/reports" element={<Reports />} />
@@ -352,7 +436,9 @@ export default function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/housekeeping" element={<Housekeeping />} />
-            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/maintenance" element={<VenueMaintenance />} />
+            <Route path="/bookings" element={<VenueBookings />} />
+            <Route path="/payroll" element={<PayrollPage />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/training" element={<Training />} />
             <Route path="/activities" element={<Activities />} />

@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -22,19 +23,33 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
+import { useSportNameMap } from '../components/SportSelect'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
 type Coach = {
   id: string
   specialization: string | null
+  sport_id: string | null
+  certification: string | null
+  experience_years: number | null
   profile: { id: string; full_name: string; contact_info: string | null } | null
   teams: { id: string; name: string }[] | null
 }
 
-const empty = { full_name: '', specialization: '' }
+const empty = { full_name: '', specialization: '', sport_id: '', certification: '', experience_years: '' }
+
+function coachPayload(f: typeof empty) {
+  return {
+    specialization: f.specialization || null,
+    sport_id: f.sport_id || null,
+    certification: f.certification || null,
+    experience_years: f.experience_years === '' ? null : Number(f.experience_years),
+  }
+}
 
 export default function Coaches() {
+  const sportName = useSportNameMap()
   const [rows, setRows] = useState<Coach[]>([])
   const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
@@ -75,7 +90,7 @@ export default function Coaches() {
       if (pErr) { setError(pErr.message); return }
       const { error } = await supabase
         .from('coaches')
-        .update({ specialization: form.specialization || null })
+        .update(coachPayload(form))
         .eq('id', editing)
       if (error) { setError(error.message); return }
     } else {
@@ -87,7 +102,7 @@ export default function Coaches() {
       if (pErr || !profile) { setError(pErr?.message ?? 'Could not create profile'); return }
       const { error } = await supabase.from('coaches').insert({
         profile_id: profile.id,
-        specialization: form.specialization || null,
+        ...coachPayload(form),
       })
       if (error) { setError(error.message); return }
     }
@@ -108,7 +123,13 @@ export default function Coaches() {
   function openEdit(r: Coach) {
     setEditing(r.id)
     setEditProfileId(r.profile?.id ?? null)
-    setForm({ full_name: r.profile?.full_name ?? '', specialization: r.specialization ?? '' })
+    setForm({
+      full_name: r.profile?.full_name ?? '',
+      specialization: r.specialization ?? '',
+      sport_id: r.sport_id ?? '',
+      certification: r.certification ?? '',
+      experience_years: r.experience_years?.toString() ?? '',
+    })
     setShowForm(true)
   }
 
@@ -154,6 +175,8 @@ export default function Coaches() {
                   <TableRow>
                     <TableCell>Name</TableCell>
                     <TableCell>Specialization</TableCell>
+                    <TableCell>Sport</TableCell>
+                    <TableCell>Experience</TableCell>
                     <TableCell>Teams</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -165,6 +188,8 @@ export default function Coaches() {
                       <TableRow key={r.id} hover>
                         <TableCell>{r.profile?.full_name ?? '-'}</TableCell>
                         <TableCell>{r.specialization ?? '-'}</TableCell>
+                        <TableCell>{r.sport_id ? (sportName.get(r.sport_id) ?? '-') : '-'}</TableCell>
+                        <TableCell>{r.experience_years != null ? `${r.experience_years} yrs` : '-'}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{(r.teams ?? []).map((t) => t.name).join(', ') || '-'}</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
@@ -199,6 +224,12 @@ export default function Coaches() {
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
               <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required fullWidth />
               <TextField label="Specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} fullWidth />
+              <TextField select label="Sport" value={form.sport_id} onChange={(e) => setForm({ ...form, sport_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {[...sportName.entries()].map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
+              </TextField>
+              <TextField label="Certification" value={form.certification} onChange={(e) => setForm({ ...form, certification: e.target.value })} fullWidth />
+              <TextField type="number" label="Experience (years)" value={form.experience_years} onChange={(e) => setForm({ ...form, experience_years: e.target.value })} fullWidth />
             </Box>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>
