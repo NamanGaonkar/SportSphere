@@ -170,96 +170,138 @@ class _AthletesPageState extends State<AthletesPage> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setM) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.85,
-            maxChildSize: 0.95,
-            builder: (ctx, scrollCtrl) => Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                  child: Row(children: [
-                    Expanded(child: Text(editing == null ? 'Add Athlete' : 'Edit Athlete',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                  ]),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView(
-                    controller: scrollCtrl,
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      TextField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Full name'),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text('Sports', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          for (final s in sports)
-                            FilterChip(
-                              label: Text('${s['name']}'),
-                              selected: sportIds.contains(s['id']),
-                              onSelected: (v) => setM(() =>
-                                  v ? sportIds.add('${s['id']}') : sportIds.remove('${s['id']}')),
-                              selectedColor: const Color(0x29FF6A13),
-                              checkmarkColor: const Color(0xFFB24A00),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      DateField(
-                        label: 'Date of birth',
-                        value: dob,
-                        // DOB is always in the past — allow from 2000.
-                        firstDate: DateTime(2000),
-                        onChanged: (v) => setM(() => dob = v ?? ''),
-                      ),
-                      const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        initialValue: teamId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Team'),
-                        items: [
-                          const DropdownMenuItem(value: '', child: Text('None')),
-                          for (final t in _teams)
-                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
-                        ],
-                        onChanged: (v) => setM(() => teamId = v ?? ''),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: medicalCtrl,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: const InputDecoration(labelText: 'Medical notes'),
-                      ),
-                    ],
+          // Plain scrollable sheet: title on top, fields below, buttons fixed
+          // at the bottom. No DraggableScrollableSheet — its collapsed height
+          // could hide the Sports chips entirely on tall screens.
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(editing == null ? 'Add Athlete' : 'Edit Athlete',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + MediaQuery.of(ctx).padding.bottom),
-                  child: Row(children: [
-                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          name = nameCtrl.text.trim();
-                          medical = medicalCtrl.text.trim();
-                          Navigator.pop(ctx, true);
-                        },
-                        child: Text(editing == null ? 'Add' : 'Save'),
-                      ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ]),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(labelText: 'Full name'),
                     ),
-                  ]),
+                    const SizedBox(height: 16),
+                    // Sports section — always visible, header shows the count.
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Sports',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                        if (sportIds.isNotEmpty)
+                          TextButton(
+                            onPressed: () => setM(() => sportIds.clear()),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            child: const Text('Clear'),
+                          ),
+                      ],
+                    ),
+                    if (sports.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('Loading sports...',
+                            style: TextStyle(fontSize: 12.5, color: Colors.black45)),
+                      )
+                    else
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final s in sports)
+                              FilterChip(
+                                label: Text('${s['name']}'),
+                                selected: sportIds.contains('${s['id']}'),
+                                showCheckmark: true,
+                                onSelected: (v) => setM(() => v
+                                    ? sportIds.add('${s['id']}')
+                                    : sportIds.remove('${s['id']}')),
+                                selectedColor: const Color(0x29FF6A13),
+                                checkmarkColor: const Color(0xFFB24A00),
+                              ),
+                          ],
+                        ),
+                      ),
+                    if (sportIds.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                            '${sportIds.length} sport${sportIds.length == 1 ? '' : 's'} selected',
+                            style: const TextStyle(fontSize: 11.5, color: Colors.black45)),
+                      ),
+                    const SizedBox(height: 16),
+                    DateField(
+                      label: 'Date of birth',
+                      value: dob,
+                      // DOB is always in the past — allow from 2000.
+                      firstDate: DateTime(2000),
+                      onChanged: (v) => setM(() => dob = v ?? ''),
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: teamId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Team'),
+                      items: [
+                        const DropdownMenuItem(value: '', child: Text('None')),
+                        for (final t in _teams)
+                          DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                      ],
+                      onChanged: (v) => setM(() => teamId = v ?? ''),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: medicalCtrl,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'Medical notes'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + MediaQuery.of(ctx).padding.bottom),
+                child: Row(children: [
+                  Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        name = nameCtrl.text.trim();
+                        medical = medicalCtrl.text.trim();
+                        Navigator.pop(ctx, true);
+                      },
+                      child: Text(editing == null ? 'Add' : 'Save'),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
           ),
         ),
       ),

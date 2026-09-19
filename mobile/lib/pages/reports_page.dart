@@ -80,20 +80,21 @@ class _ReportsPageState extends State<ReportsPage> {
       }
       // Shared rolling 30-day window (same algorithm as web lib/dates.ts).
       // Rate is against the full roster so 1 mark can never read as 100%.
+      // results: 0 athlete_sports, 1 teams, 2 attendance, 3 roster, 4 awards.
       final window = attendanceWindow(
         (results[2] as List)
             .cast<DbRow>()
             .map((r) => (date: '${r['date']}', status: '${r['status']}'))
             .toList(),
         30,
-        roster: (results[4] as List).length,
+        roster: (results[3] as List).length,
       );
 
       setState(() {
         _athleteSports = am.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _teamSports = tm.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
-        _awards = (results[5] as List).cast<DbRow>();
+        _awards = (results[4] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {
