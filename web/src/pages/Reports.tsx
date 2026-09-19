@@ -96,6 +96,17 @@ export default function Reports() {
     fontFamily: 'Lato, sans-serif',
   }
 
+  // Explicit X ticks for the 30-day chart: every 3rd day STARTING AT THE
+  // NEWEST date (index 0, since attendanceWindow is newest-first), and the
+  // oldest column is always appended. With `reversed` + `interval`, Recharts
+  // counted tick indexes from the oldest side, so the newest date was the
+  // one that got silently dropped from the axis. Explicit values fix that.
+  const attTicks = attData
+    .map((_, i) => i)
+    .filter((i) => i % 3 === 0 || i === attData.length - 1)
+    .map((i) => attData[i]?.day)
+    .filter((d): d is string => !!d)
+
   if (loading) return <LoadingState />
 
   return (
@@ -107,15 +118,27 @@ export default function Reports() {
           {sportData.length === 0 ? (
             <EmptyState text="No athlete data yet." />
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={sportData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {sportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconSize={9} wrapperStyle={{ fontSize: 11.5 }} />
-              </PieChart>
-            </ResponsiveContainer>
+            // Donut on the left, labeled list on the right (web only) —
+            // replaces the cramped bottom legend.
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ResponsiveContainer width="55%" height={280}>
+                <PieChart>
+                  <Pie data={sportData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                    {sportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [`${v} athlete${Number(v) === 1 ? '' : 's'}`, n as string]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1 }}>
+                {sportData.map((d, i) => (
+                  <Box key={d.name} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: CHART_COLORS[i % CHART_COLORS.length], flexShrink: 0 }} />
+                    <Typography noWrap sx={{ fontSize: 12.5, flex: 1, color: 'text.primary' }}>{d.name}</Typography>
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>{d.value}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           )}
         </Section>
 
@@ -123,33 +146,47 @@ export default function Reports() {
           {teamsSportData.length === 0 ? (
             <EmptyState text="No team data yet." />
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={teamsSportData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {teamsSportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconSize={9} wrapperStyle={{ fontSize: 11.5 }} />
-              </PieChart>
-            </ResponsiveContainer>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ResponsiveContainer width="55%" height={280}>
+                <PieChart>
+                  <Pie data={teamsSportData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                    {teamsSportData.map((_, i) => <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [`${v} team${Number(v) === 1 ? '' : 's'}`, n as string]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <Box sx={{ flex: 1, minWidth: 0, pr: 1 }}>
+                {teamsSportData.map((d, i) => (
+                  <Box key={d.name} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: CHART_COLORS[(i + 2) % CHART_COLORS.length], flexShrink: 0 }} />
+                    <Typography noWrap sx={{ fontSize: 12.5, flex: 1, color: 'text.primary' }}>{d.name}</Typography>
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>{d.value}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           )}
         </Section>
 
         <Section title="Attendance Rate - Last 30 Days (%)">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={attData} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={attData} margin={{ left: 4, right: 8, top: 8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={palette.border} vertical={false} />
               <XAxis
                 dataKey="day"
                 stroke={palette.textMuted}
                 fontSize={10}
                 tickLine={false}
-                // Every 5th day labeled — fixed ticks, no random skipping.
-                interval={4}
-                angle={-35}
+                // Reversed axis: newest day first so the LAST column is today
+                // and always carries a visible label (previously the newest
+                // date was the one that got dropped by the tick filter).
+                reversed
+                interval={0}
+                ticks={attTicks}
+                angle={-40}
                 textAnchor="end"
-                height={50}
-                tickMargin={6}
+                height={54}
+                tickMargin={8}
               />
               <YAxis
                 stroke={palette.textMuted}
@@ -157,10 +194,17 @@ export default function Reports() {
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
                 tickLine={false}
+                width={44}
                 tickFormatter={(v: number) => `${v}%`}
               />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: palette.black, fontWeight: 700 }} formatter={(v) => [`${v}%`, 'Attendance']} />
-              <Bar dataKey="present" fill={palette.primary} radius={[6, 6, 0, 0]} maxBarSize={14} />
+              <Tooltip
+                cursor={{ fill: 'rgba(255,106,19,0.08)' }}
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: palette.black, fontWeight: 700 }}
+                // Unmarked days carry null — say so instead of showing "0%".
+                formatter={(v) => (v == null ? ['No marks recorded', 'Attendance'] : [`${v}%`, 'Attendance'])}
+              />
+              <Bar dataKey="present" name="Attendance" fill={palette.primary} radius={[6, 6, 0, 0]} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
         </Section>

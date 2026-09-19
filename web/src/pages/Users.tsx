@@ -123,26 +123,32 @@ export default function Users() {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((r) => (
                       <TableRow key={r.id} hover>
-                        <TableCell>
+                        {/* Compact inline editors: no under-full standard
+                            TextFields stretching into empty space. */}
+                        <TableCell sx={{ width: 220 }}>
                           <TextField
                             defaultValue={r.full_name}
                             onBlur={(e) => rename(r, e.target.value)}
                             variant="standard"
-                            sx={{ '& input': { fontWeight: 600 } }}
+                            fullWidth
+                            slotProps={{ input: { disableUnderline: false } }}
+                            sx={{ '& input': { fontWeight: 600, py: 0.5 } }}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ width: 200 }}>
                           <TextField
                             defaultValue={r.contact_info ?? ''}
                             onBlur={(e) => setContact(r, e.target.value)}
                             variant="standard"
                             placeholder="-"
+                            fullWidth
+                            sx={{ '& input': { py: 0.5 } }}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>
                           {r.athletes?.length ? 'Athlete record' : r.coaches?.length ? 'Coach record' : r.staff?.length ? 'Staff record' : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ width: 210 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75 }}>
                             <Chip size="small" color={roleColor(r.role) as 'error'} label={r.role} />
                             <TextField
@@ -150,14 +156,14 @@ export default function Users() {
                               size="small"
                               value={r.role}
                               onChange={(e) => setRole(r, e.target.value)}
-                              sx={{ width: 170 }}
+                              fullWidth
                               disabled={r.role === 'Admin'}
                             >
                               {ROLES.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}
                             </TextField>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ color: 'text.secondary' }}>{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString()}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
