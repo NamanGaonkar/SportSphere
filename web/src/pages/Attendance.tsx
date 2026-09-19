@@ -87,6 +87,8 @@ export default function Attendance() {
   }, [rows, date])
 
   async function mark(r: AthleteRow, status: string, leaveReason?: string) {
+    // Marking is only allowed for today onward - past dates are view-only.
+    if (date < new Date().toISOString().slice(0, 10)) return
     setSaving(true)
     const existing = (r.profile?.attendance ?? []).find((a) => a.date === date)
     const payload: Record<string, unknown> = { status }
@@ -118,10 +120,10 @@ export default function Attendance() {
             value={date}
             slotProps={{
               inputLabel: { shrink: true },
-              // Attendance can only be recorded for today onward.
-              htmlInput: { min: new Date().toISOString().slice(0, 10) },
+              formHelperText: { sx: { mx: 0.5 } },
             }}
             onChange={(e) => setDate(e.target.value)}
+            helperText="View any date - marking is only allowed for today onward"
           />
         }
       />
@@ -179,7 +181,7 @@ export default function Attendance() {
                                 <Button
                                   key={st}
                                   size="small"
-                                  disabled={saving}
+                                  disabled={saving || date < new Date().toISOString().slice(0, 10)}
                                   variant={s === st ? 'contained' : 'outlined'}
                                   onClick={() => onMark(r, st)}
                                   sx={{ minWidth: 72 }}

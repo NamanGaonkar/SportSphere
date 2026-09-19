@@ -134,6 +134,8 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     if (ok == true && mounted) await _mark(r, 'Leave', leaveReason: ctrl.text.trim());
   }
 
+  bool get _viewOnly => _date.compareTo(DateTime.now().toIso8601String().split('T').first) < 0;
+
   @override
   Widget build(BuildContext context) {
     final s = _summary;
@@ -145,7 +147,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
           // Title and date picker are separate rows — the date field never
           // squeezes/overflows the header on narrow screens.
           const PageHead('Attendance & Leave',
-              sub: 'Mark daily attendance for athletes and staff.'),
+              sub: 'View any date. Marking is allowed for today onward.'),
           Row(
             children: [
               const Text('Date',
@@ -155,9 +157,12 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                 child: SizedBox(
                   height: 48,
                   child: DateField(
-                    label: 'Pick date',
+                    label: 'View date',
                     value: _date,
                     onChanged: (v) => setState(() => _date = v ?? _date),
+                    // Viewing any past date is allowed; the mark buttons are
+                    // disabled for past days below.
+                    firstDate: DateTime(2000),
                   ),
                 ),
               ),
@@ -242,7 +247,8 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
           ),
           const SizedBox(height: 8),
           // Status buttons stretch evenly across the row — no wrapping,
-          // no vertical stretching, fixed compact height.
+          // no vertical stretching, fixed compact height. Past dates are
+          // view-only (buttons disabled).
           Row(
             children: [
               for (var i = 0; i < _statuses.length; i++) ...[
@@ -260,7 +266,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                                 ? Brand.primary
                                 : Brand.primary.withValues(alpha: 0.5)),
                       ),
-                      onPressed: _saving ? null : () => _onMark(r, _statuses[i]),
+                      onPressed: (_saving || _viewOnly) ? null : () => _onMark(r, _statuses[i]),
                       child: Text(_statuses[i], style: const TextStyle(fontSize: 12)),
                     ),
                   ),

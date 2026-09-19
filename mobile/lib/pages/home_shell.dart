@@ -451,7 +451,7 @@ class _DashboardHomeState extends State<DashboardHome> {
           c.from('profiles').select('full_name, role').eq('id', uid).maybeSingle()
         else
           Future.value(null),
-        c.from('payroll').select('id, month, net, staff(profile:profiles(full_name))').order('month', ascending: false).limit(6),
+        c.from('payroll').select('id, month, net, staff_id, coach_id, staff:staff_id(profile:profiles(full_name)), coach:coach_id(profile:profiles(full_name))').order('month', ascending: false).limit(6),
         c.from('inventory_items').select('id, name, quantity, min_stock, condition'),
         c.from('purchase_orders').select('id, status'),
         c
@@ -609,7 +609,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                             children: [
                               Expanded(
                                 child: Text(
-                                    (((p['staff'] ?? {}) as Map)['profile'] ?? {})['full_name']?.toString() ?? '-',
+                                    _payrollName(p),
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 13)),
                               ),
@@ -712,6 +712,18 @@ class _DashboardHomeState extends State<DashboardHome> {
     final sorted = [..._equip];
     sorted.sort((a, b) => ((a['quantity'] ?? 0) as num).compareTo((b['quantity'] ?? 0) as num));
     return sorted.take(6).toList();
+  }
+
+  String _payrollName(DbRow p) {
+    final staff = p['staff'] as Map?;
+    if (staff != null && staff['profile'] != null) {
+      return ((((staff['profile'] as Map)['full_name']) ?? '-')).toString();
+    }
+    final coach = p['coach'] as Map?;
+    if (coach != null && coach['profile'] != null) {
+      return ((((coach['profile'] as Map)['full_name']) ?? '-')).toString();
+    }
+    return '-';
   }
 
   num? _toNum(dynamic v) => v is num ? v : num.tryParse('${v ?? ''}');

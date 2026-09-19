@@ -396,8 +396,9 @@ export default function App() {
               sx={{
                 color: 'rgba(255,255,255,0.72)',
                 borderColor: 'rgba(255,255,255,0.25)',
+                borderRadius: 999,
                 minWidth: collapsed ? 0 : undefined,
-                px: collapsed ? 0 : undefined,
+                px: collapsed ? 1 : undefined,
                 '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
               }}
               variant="outlined"
@@ -408,15 +409,15 @@ export default function App() {
           </Box>
         </Drawer>
 
-        {/* Main content: offset by the floating rail (12px gap + rail width + 12px gap). */}
+        {/* Main content: the Drawer already reserves the rail's width in the
+            flex layout (the paper itself is position:fixed) — so no extra
+            margin is needed beyond the page padding. */}
         <Box
           component="main"
           sx={{
             flex: 1,
             minWidth: 0,
             p: { xs: 2, md: 3 },
-            ml: `${drawerWidth + 24}px`,
-            width: `calc(100% - ${drawerWidth + 24}px)`,
           }}
         >
           <Routes>

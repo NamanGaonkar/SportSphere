@@ -34,6 +34,7 @@ type PayrollRow = {
   month: string
   net: number | null
   staff: { profile: { full_name: string } | null } | null
+  coach: { profile: { full_name: string } | null } | null
 }
 type AwardRow = {
   id: string
@@ -76,7 +77,7 @@ export default function Dashboard() {
           .limit(6),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
         supabase.from('teams').select('id, sport_id'),
-        supabase.from('payroll').select('id, month, net, staff(profile:profiles(full_name))').order('month', { ascending: false }).limit(6),
+        supabase.from('payroll').select('id, month, net, staff_id, coach_id, staff:staff_id(profile:profiles(full_name)), coach:coach_id(profile:profiles(full_name))').order('month', { ascending: false }).limit(6),
         supabase.from('awards').select('id, title, date, level, athletes(profile:profiles(full_name))').order('date', { ascending: false }).limit(6),
         supabase.from('inventory_items').select('id, name, quantity, min_stock, condition'),
         supabase.from('purchase_orders').select('id, status'),
@@ -317,7 +318,7 @@ export default function Dashboard() {
                 <TableBody>
                   {payroll.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>{p.staff?.profile?.full_name ?? '-'}</TableCell>
+                      <TableCell>{p.staff?.profile?.full_name ?? p.coach?.profile?.full_name ?? '-'}</TableCell>
                       <TableCell sx={{ color: 'text.secondary' }}>{p.month?.slice(0, 7)}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>{inr(p.net)}</TableCell>
                     </TableRow>

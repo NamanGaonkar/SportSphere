@@ -143,14 +143,14 @@ export default function Users() {
                           {r.athletes?.length ? 'Athlete record' : r.coaches?.length ? 'Coach record' : r.staff?.length ? 'Staff record' : '-'}
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75 }}>
                             <Chip size="small" color={roleColor(r.role) as 'error'} label={r.role} />
                             <TextField
                               select
                               size="small"
                               value={r.role}
                               onChange={(e) => setRole(r, e.target.value)}
-                              sx={{ minWidth: 140 }}
+                              sx={{ width: 170 }}
                               disabled={r.role === 'Admin'}
                             >
                               {ROLES.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}
