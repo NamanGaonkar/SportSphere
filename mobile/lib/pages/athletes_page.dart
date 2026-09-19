@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/sports.dart';
+import '../main.dart' show Brand;
 import '../widgets/common.dart';
 import 'crud_page.dart' show DbRow;
 
@@ -236,13 +237,20 @@ class _AthletesPageState extends State<AthletesPage> {
                             for (final s in sports)
                               FilterChip(
                                 label: Text('${s['name']}'),
+                                labelStyle: TextStyle(
+                                  color: sportIds.contains('${s['id']}')
+                                      ? const Color(0xFF8A3D00)
+                                      : Brand.black,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12.5,
+                                ),
                                 selected: sportIds.contains('${s['id']}'),
                                 showCheckmark: true,
                                 onSelected: (v) => setM(() => v
                                     ? sportIds.add('${s['id']}')
                                     : sportIds.remove('${s['id']}')),
-                                selectedColor: const Color(0x29FF6A13),
-                                checkmarkColor: const Color(0xFFB24A00),
+                                selectedColor: const Color(0x40FF6A13),
+                                checkmarkColor: const Color(0xFF8A3D00),
                               ),
                           ],
                         ),

@@ -80,44 +80,55 @@ class _CoachesPageState extends State<CoachesPage> {
                 : PagedTable(
                     items: _filtered,
                     emptyText: 'No coaches found.',
+                    // Row keeps 3 clean columns; team assignments moved into
+                    // the expandable detail panel as chips.
                     columns: const [
                       DataColumn(label: Text('Name')),
                       DataColumn(label: Text('Specialization')),
-                      DataColumn(label: Text('Sport')),
-                      DataColumn(label: Text('Teams')),
                       DataColumn(label: Text('Actions')),
                     ],
-                    rowBuilder: (r) {
+                    chipsBuilder: (r) {
                       final teams = (r['teams'] as List?) ?? const [];
+                      return [
+                        if (r['specialization']?.toString().isNotEmpty == true)
+                          ('${r['specialization']}', const Color(0xFF1565C0)),
+                        for (final t in teams)
+                          (
+                            '${(t as Map)['name'] ?? '-'}',
+                            const Color(0xFFB24A00),
+                          ),
+                      ];
+                    },
+                    detailBuilder: (r) {
+                      final teams = (r['teams'] as List?) ?? const [];
+                      return [
+                        MapEntry(
+                            'Sport',
+                            SportsCache.instance.name(r['sport_id']?.toString()).isEmpty
+                                ? '-'
+                                : SportsCache.instance.name(r['sport_id']?.toString())),
+                        MapEntry('Teams assigned', teams.isEmpty ? '-' : '${teams.length}'),
+                        for (final t in teams)
+                          MapEntry('Team', '${(t as Map)['name'] ?? '-'}'),
+                        MapEntry(
+                            'Experience',
+                            r['experience_years'] == null
+                                ? '-'
+                                : '${r['experience_years']} yrs'),
+                        MapEntry(
+                            'Certification',
+                            r['certification']?.toString().isEmpty ?? true
+                                ? '-'
+                                : '${r['certification']}'),
+                        MapEntry(
+                            'Contact',
+                            '${((r['profile'] ?? {}) as Map)['contact_info'] ?? '-'}'),
+                      ];
+                    },
+                    rowBuilder: (r) {
                       return DataRow(cells: [
                         DataCell(Text('${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}')),
                         DataCell(Text('${r['specialization'] ?? '-'}')),
-                        DataCell(Text(SportsCache.instance.name(r['sport_id']?.toString()))),
-                        DataCell(
-                          teams.isEmpty
-                              ? const Text('-', style: TextStyle(color: Colors.black26))
-                              // Team chips instead of a comma blob — each
-                              // assignment is scannable at a glance.
-                              : Wrap(
-                                  spacing: 4,
-                                  runSpacing: 4,
-                                  children: [
-                                    for (final t in teams)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0x14FF6A13),
-                                          borderRadius: BorderRadius.circular(999),
-                                          border: Border.all(color: const Color(0x40FF6A13)),
-                                        ),
-                                        child: Text(
-                                          '${(t as Map)['name'] ?? '-'}',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFB24A00)),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                        ),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(
                             visualDensity: VisualDensity.compact,

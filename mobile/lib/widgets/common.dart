@@ -403,7 +403,11 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
         if (i == 0) return 120.0; // name/title column
         return 78.0;
       });
-      final weights = List<double>.generate(n, (i) => i == 0 ? 2.0 : 1.0);
+      // Columns after the first share width equally (weight 1.0) except the
+      // actions column which keeps its fixed minimum — prevents a Wrap of
+      // chips in a middle column from squeezing other columns to a sliver.
+      final weights = List<double>.generate(
+          n, (i) => (i == 0 || i == n - 1) ? 1.0 : 1.6);
       final sumW = weights.fold<double>(0, (s, w) => s + w);
       final minTotal =
           (hasDetail ? chevronW : 0) + minW.fold<double>(0, (s, w) => s + w);

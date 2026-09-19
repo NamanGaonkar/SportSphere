@@ -143,6 +143,18 @@ class SportSphereApp extends StatelessWidget {
         bodyColor: Brand.black,
         displayColor: Brand.black,
       ),
+      // FilterChip labels must stay readable in BOTH states: dark ink on
+      // light backgrounds when unselected, dark ink on the orange tint when
+      // selected (white labels were invisible on the pale chip fill).
+      chipTheme: base.chipTheme.copyWith(
+        labelStyle: const TextStyle(color: Brand.black, fontSize: 12.5, fontWeight: FontWeight.w600),
+        secondaryLabelStyle: const TextStyle(color: Brand.black, fontSize: 12.5, fontWeight: FontWeight.w600),
+        selectedColor: const Color(0x33FF6A13),
+        backgroundColor: const Color(0xFFF3F3EE),
+        checkmarkColor: const Color(0xFFB24A00),
+        side: const BorderSide(color: Color(0xFFDDDDD2)),
+        showCheckmark: true,
+      ),
       scaffoldBackgroundColor: Brand.background,
       appBarTheme: const AppBarTheme(
         backgroundColor: Brand.background,
@@ -205,9 +217,6 @@ class SportSphereApp extends StatelessWidget {
         ),
       ),
       dividerTheme: const DividerThemeData(color: Color(0xFFE5E5E0), thickness: 1),
-      chipTheme: base.chipTheme.copyWith(
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: Brand.black,
         contentTextStyle: const TextStyle(color: Colors.white),

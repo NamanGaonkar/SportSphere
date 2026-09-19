@@ -238,7 +238,10 @@ export default function Dashboard() {
                     dataKey="name"
                     stroke={palette.textMuted}
                     fontSize={11}
-                    width={150}
+                    // Wider gutter + interval={0} so EVERY sport name renders
+                    // in full ("Football" was previously cut off / skipped).
+                    width={190}
+                    interval={0}
                     tickLine={false}
                     // Scale bar band to fill the plot height evenly.
                     scale="band"

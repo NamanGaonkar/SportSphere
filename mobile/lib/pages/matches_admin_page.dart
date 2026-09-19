@@ -22,11 +22,21 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
   bool _loading = true;
   String _tournamentFilter = '';
   String? _sportFilter;
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Live sync: score edits from web (or the dashboard) update this list
+    // instantly, and vice versa.
+    _channel = listen('matches', _load);
+  }
+
+  @override
+  void dispose() {
+    if (_channel != null) client.removeChannel(_channel!);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -217,15 +227,24 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
   }
 
   Widget _scoreBox(DbRow m, String side, String initial) {
+    final ctrl = TextEditingController(text: initial);
     return SizedBox(
       width: 56,
       child: TextFormField(
-        initialValue: initial,
+        controller: ctrl,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Brand.primary),
         decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+        // Save on submit AND on focus loss (web parity) — typing a score and
+        // tapping away now persists instead of silently reverting.
         onFieldSubmitted: (v) => _updateScore(m, side, v),
+        onTapOutside: (_) {
+          if (ctrl.text != initial) _updateScore(m, side, ctrl.text);
+        },
+        onEditingComplete: () {
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
       ),
     );
   }
