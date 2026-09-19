@@ -148,23 +148,27 @@ class PageHead extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
-                if (sub != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(sub!, style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
-                  ),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+              ),
+              // Action button (e.g. Add) sits beside the title and always
+              // stays fully visible, never squeezed off-screen.
+              ?action,
+            ],
           ),
-          ?action,
+          if (sub != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(sub!, style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
+            ),
         ],
       ),
     );

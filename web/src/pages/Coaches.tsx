@@ -4,6 +4,8 @@ import Paper from '@mui/material/Paper'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
+import Chip from '@mui/material/Chip'
+import Typography from '@mui/material/Typography'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -190,7 +192,18 @@ export default function Coaches() {
                         <TableCell>{r.specialization ?? '-'}</TableCell>
                         <TableCell>{r.sport_id ? (sportName.get(r.sport_id) ?? '-') : '-'}</TableCell>
                         <TableCell>{r.experience_years != null ? `${r.experience_years} yrs` : '-'}</TableCell>
-                        <TableCell sx={{ color: 'text.secondary' }}>{(r.teams ?? []).map((t) => t.name).join(', ') || '-'}</TableCell>
+                        <TableCell>
+                          {(r.teams ?? []).length === 0 ? (
+                            <Typography variant="body2" sx={{ color: 'text.disabled' }}>-</Typography>
+                          ) : (
+                            // Chip per team assignment — scannable, not a comma blob.
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {r.teams!.map((t) => (
+                                <Chip key={t.id} size="small" label={t.name} variant="outlined" sx={{ borderColor: 'rgba(255,106,19,0.4)', color: '#B25A1F', fontSize: 12 }} />
+                              ))}
+                            </Box>
+                          )}
+                        </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
                             <EditOutlinedIcon fontSize="small" />

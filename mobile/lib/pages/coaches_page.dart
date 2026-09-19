@@ -93,8 +93,31 @@ class _CoachesPageState extends State<CoachesPage> {
                         DataCell(Text('${((r['profile'] ?? {}) as Map)['full_name'] ?? '-'}')),
                         DataCell(Text('${r['specialization'] ?? '-'}')),
                         DataCell(Text(SportsCache.instance.name(r['sport_id']?.toString()))),
-                        DataCell(Text(
-                            teams.isEmpty ? '-' : teams.map((t) => (t as Map)['name']).join(', '))),
+                        DataCell(
+                          teams.isEmpty
+                              ? const Text('-', style: TextStyle(color: Colors.black26))
+                              // Team chips instead of a comma blob — each
+                              // assignment is scannable at a glance.
+                              : Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children: [
+                                    for (final t in teams)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0x14FF6A13),
+                                          borderRadius: BorderRadius.circular(999),
+                                          border: Border.all(color: const Color(0x40FF6A13)),
+                                        ),
+                                        child: Text(
+                                          '${(t as Map)['name'] ?? '-'}',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFB24A00)),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                        ),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(
                             visualDensity: VisualDensity.compact,

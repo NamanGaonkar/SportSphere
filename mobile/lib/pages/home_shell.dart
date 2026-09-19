@@ -207,124 +207,152 @@ class _HomeShellState extends State<HomeShell> {
         items.indexWhere((i) => i.label == currentLabel).clamp(0, items.isEmpty ? 0 : items.length - 1);
 
     return Scaffold(
+      // Floating detached drawer — same look as the web sidebar: a rounded
+      // black rail inset from every edge with a soft shadow, never touching
+      // the screen border.
       drawer: Drawer(
-        backgroundColor: Brand.black,
+        backgroundColor: Colors.transparent,
         shape: const RoundedRectangleBorder(),
         child: SafeArea(
-          child: Column(
-            children: [
-              // Header: logo + app name (fixed drawer, no collapse toggle).
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-                child: Row(
-                  children: [
-                    Image.asset('assets/images/logo.png', width: 28, height: 32, fit: BoxFit.contain),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('SportSphere',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              letterSpacing: 0.2)),
-                    ),
-                  ],
-                ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Brand.black,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 40,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
-              const Divider(color: Colors.white12, height: 1),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  children: [
-                    for (final s in _sections) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
-                        child: Text(s.section.toUpperCase(),
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
-                                color: Colors.white.withValues(alpha: 0.42))),
-                      ),
-                      for (final item in s.items)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: () {
-                              setState(() => _current = item.label);
-                              // Remember the user's choice across sessions.
-                              _prefs?.setString(_kPrefKey, item.label);
-                              Navigator.pop(context);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 11),
-                              margin: const EdgeInsets.symmetric(vertical: 1),
-                              decoration: BoxDecoration(
-                                color: _current == item.label
-                                    ? Brand.primary
-                                    : Colors.transparent,
+              child: Column(
+                children: [
+                  // Header: logo + app name (fixed drawer, no collapse toggle).
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+                    child: Row(
+                      children: [
+                        Image.asset('assets/images/logo.png', width: 28, height: 32, fit: BoxFit.contain),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text('SportSphere',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  letterSpacing: 0.2)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white12, height: 1),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      children: [
+                        for (final s in _sections) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
+                            child: Text(s.section.toUpperCase(),
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.2,
+                                    color: Colors.white.withValues(alpha: 0.42))),
+                          ),
+                          for (final item in s.items)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: InkWell(
                                 borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(item.icon,
-                                      size: 20,
-                                      color: _current == item.label
-                                          ? Colors.white
-                                          : Colors.white70),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(item.label,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.white
-                                                .withValues(alpha: _current == item.label ? 1 : 0.72),
-                                            fontWeight: _current == item.label
-                                                ? FontWeight.w700
-                                                : FontWeight.w400)),
+                                onTap: () {
+                                  setState(() => _current = item.label);
+                                  // Remember the user's choice across sessions.
+                                  _prefs?.setString(_kPrefKey, item.label);
+                                  Navigator.pop(context);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 11),
+                                  margin: const EdgeInsets.symmetric(vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: _current == item.label
+                                        ? Brand.primary
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                ],
+                                  child: Row(
+                                    children: [
+                                      Icon(item.icon,
+                                          size: 20,
+                                          color: _current == item.label
+                                              ? Colors.white
+                                              : Colors.white70),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Text(item.label,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.white
+                                                    .withValues(alpha: _current == item.label ? 1 : 0.72),
+                                                fontWeight: _current == item.label
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w400)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white12, height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                Supabase.instance.client.auth.currentUser?.email ?? '',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                              ),
+                              Text(_role ?? '',
+                                  style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                            ],
                           ),
                         ),
-                    ],
-                  ],
-                ),
-              ),
-              const Divider(color: Colors.white12, height: 1),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            Supabase.instance.client.auth.currentUser?.email ?? '',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        // Pill-shaped sign out (matches the web rail button).
+                        InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: _signOut,
+                          child: Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                            ),
+                            child: const Icon(Icons.logout, color: Colors.white70, size: 19),
                           ),
-                          Text(_role ?? '',
-                              style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
-                      onPressed: _signOut,
-                      tooltip: 'Sign out',
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -381,6 +409,7 @@ class _DashboardHomeState extends State<DashboardHome> {
   List<DbRow> _payroll = [];
   List<DbRow> _equip = [];
   List<DbRow> _med = [];
+  List<DbRow> _awards = [];
   int _pendingPO = 0;
   String _name = '';
   String _role = '';
@@ -461,6 +490,12 @@ class _DashboardHomeState extends State<DashboardHome> {
             .select('id, athlete_id, type, cleared, date, athletes(profile:profiles(full_name))')
             .order('date', ascending: false)
             .limit(8),
+        // Recent Awards & Achievements — same query/shape as web Dashboard.
+        c
+            .from('awards')
+            .select('id, title, date, level, athletes(profile:profiles(full_name))')
+            .order('date', ascending: false)
+            .limit(6),
       ]);
       if (!mounted) return;
 
@@ -472,9 +507,12 @@ class _DashboardHomeState extends State<DashboardHome> {
             .map((r) => (date: '${r['date']}', status: '${r['status']}'))
             .toList(),
         7,
-        roster: (results[12] as List).length,
+        roster: (results[6] as List).length,
       );
-      final profile = results[6] as DbRow?;
+      // results: 0 athletes, 1 coaches, 2 teams, 3 tournaments, 4 matches,
+      // 5 attendance, 6 roster profiles, 7 own profile, 8 payroll,
+      // 9 inventory, 10 POs, 11 medical, 12 awards.
+      final profile = results[7] as DbRow?;
 
       setState(() {
         _athletes = (results[0] as List).length;
@@ -492,7 +530,8 @@ class _DashboardHomeState extends State<DashboardHome> {
             .cast<DbRow>()
             .where((r) => r['status'] == 'Ordered')
             .length;
-        _med = (results[12] as List).cast<DbRow>();
+        _med = (results[11] as List).cast<DbRow>();
+        _awards = (results[12] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {
@@ -651,6 +690,43 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     ? const Color(0xFFB26A00)
                                     : const Color(0xFF2E7D32),
                               ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          // Recent Awards & Achievements — parity with web Dashboard.
+          _Card(
+            title: 'Recent Awards & Achievements',
+            child: _awards.isEmpty
+                ? const EmptyState('No awards recorded yet.')
+                : Column(
+                    children: [
+                      for (final a in _awards)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                    ((((a['athletes'] ?? {}) as Map)['profile'] ?? {})['full_name'] ?? '-').toString(),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13)),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text('${a['title'] ?? '-'}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                              ),
+                              BadgeChip('${a['level'] ?? '-'}',
+                                  color: statusColor('${a['level'] ?? ''}')),
+                              const SizedBox(width: 8),
+                              Text(fmtDate(a['date']?.toString()),
+                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
                             ],
                           ),
                         ),
