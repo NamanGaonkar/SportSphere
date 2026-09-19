@@ -857,7 +857,11 @@ class VBars extends StatelessWidget {
   final List<DayPoint> points;
   final double barWidth;
   final double height;
-  const VBars(this.points, {super.key, this.barWidth = 22, this.height = 170});
+  /// Show a value label above every bar (off for dense 30-day charts).
+  final bool showValueLabels;
+  /// Label every Nth day on the x-axis (0 = all). Dense charts use 3.
+  final int labelEvery;
+  const VBars(this.points, {super.key, this.barWidth = 22, this.height = 170, this.showValueLabels = true, this.labelEvery = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -870,7 +874,7 @@ class VBars extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            for (final p in points)
+            for (var i = 0; i < points.length; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: SizedBox(
@@ -879,17 +883,24 @@ class VBars extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(p.marked ? '${p.pct}%' : '-',
-                          style: const TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black54)),
+                      if (showValueLabels)
+                        Text(points[i].marked ? '${points[i].pct}%' : '-',
+                            style: const TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black54))
+                      else if (points[i].marked && points[i].pct >= 100)
+                        // Dense mode: only flag the extremes so the top never
+                        // looks blank, but never prints 30 overlapping labels.
+                        Text('100%', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.black45))
+                      else
+                        const SizedBox(height: 12),
                       const SizedBox(height: 4),
-                      if (p.marked)
+                      if (points[i].marked)
                         Align(
                           alignment: Alignment.bottomCenter,
                           child: Container(
                             width: barWidth,
                             // pct/100 * plotH — true percentage scale.
-                            height: (p.pct / 100) * plotH,
+                            height: (points[i].pct / 100) * plotH,
                             decoration: const BoxDecoration(
                               color: Brand.primary,
                               borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
@@ -900,7 +911,13 @@ class VBars extends StatelessWidget {
                         // Unmarked day: a small dash, never a bar.
                         Container(width: barWidth, height: 2, color: Colors.black12),
                       const SizedBox(height: 5),
-                      Text(p.label,
+                      // X-axis: label every Nth day (cadence fixed from the
+                      // start of the window, like web interval={2}) so ticks
+                      // are evenly spaced and never collide.
+                      Text(
+                          (labelEvery <= 0 || i % labelEvery == 0)
+                              ? points[i].label
+                              : '',
                           overflow: TextOverflow.clip,
                           style: const TextStyle(fontSize: 9.5, color: Colors.black45)),
                     ],

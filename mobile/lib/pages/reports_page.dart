@@ -131,7 +131,11 @@ class _ReportsPageState extends State<ReportsPage> {
             child: VBars(
               [for (final a in _attendance) DayPoint('', a.day, 0, 0, a.pct.toInt())],
               barWidth: 9,
-              height: 190,
+              height: 200,
+              // 30 bars: suppress the per-bar % (overlap), label every 3rd
+              // day — same cadence as the web chart.
+              showValueLabels: false,
+              labelEvery: 3,
             ),
           ),
           const SizedBox(height: 16),

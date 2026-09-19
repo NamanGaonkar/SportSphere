@@ -7,7 +7,7 @@ Test accounts — all created and login-verified
 ├──────────────┼───────────────────┼──────────────────────────────┼───────────┤
 │ Admin        │ Admin SportSphere │ admin@sportsphere.app        │ Test@1234 │
 │ Athlete      │ Athlete One       │ athlete@sportsphere.app      │ Test@1234 │
-│ Coach        │ Coach One         │ coach@sportsphere.app        │ Test@1234 │
+│ Coach        │ Naman Gaonkar     │ coach@sportsphere.app        │ Test@1234 │
 │ HR           │ HR Manager        │ hr@sportsphere.app           │ Test@1234 │
 │ Finance      │ Finance Lead      │ finance@sportsphere.app      │ Test@1234 │
 │ VenueManager │ Venue Manager     │ venuemanager@sportsphere.app │ Test@1234 |
