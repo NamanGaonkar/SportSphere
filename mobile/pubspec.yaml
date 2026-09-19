@@ -38,6 +38,20 @@ dependencies:
   intl: ^0.20.3
   image_picker: ^1.1.2
   shared_preferences: ^2.3.2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  http: ^1.6.0
+
+# path_provider_foundation >=2.4 pulls in objective_c, whose native-assets
+# build hook fails on project paths containing spaces ("DAY 31"), and
+# path_provider_android >=2.3 pulls in jni, which requires a REAL NDK CMake
+# toolchain (this PC uses the fake-NDK workaround). The 2.2.x/2.4.1 era
+# uses plain platform channels and has neither dependency — Android/iOS
+# behavior is unchanged.
+dependency_overrides:
+  path_provider: 2.1.4
+  path_provider_android: 2.2.10
+  path_provider_foundation: 2.4.1
 
 dev_dependencies:
   flutter_test:

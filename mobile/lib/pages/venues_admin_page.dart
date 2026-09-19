@@ -1,10 +1,266 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../widgets/common.dart';
 import 'crud_page.dart' show DbRow;
 
 final client = Supabase.instance.client;
+
+// OpenStreetMap tiles — free, no API key, no billing account required.
+const _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+// Default map center: Bengaluru, India.
+const _defaultCenter = LatLng(12.9716, 77.5946);
+
+/// Reverse-geocode lat/lng into a human-readable address via Nominatim.
+/// Falls back to raw coordinates when the lookup fails or is rate-limited.
+Future<String> _reverseGeocode(double lat, double lng) async {
+  try {
+    final res = await http.get(
+      Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lng'),
+      headers: {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 8));
+    if (res.statusCode == 200) {
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      final name = j['display_name'];
+      if (name is String && name.isNotEmpty) return name;
+    }
+  } catch (_) {}
+  return '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+}
+
+/// Forward-geocode a typed place name to lat/lng via Nominatim (OSM's
+/// free geocoding service). Returns null when nothing matches.
+Future<List<Map<String, dynamic>>> _searchPlaces(String query) async {
+  try {
+    final res = await http.get(
+      Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${Uri.encodeComponent(query)}'),
+      headers: {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 8));
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      return list.cast<Map<String, dynamic>>();
+    }
+  } catch (_) {}
+  return const [];
+}
+
+/// Interactive map page shown as a full-screen route from the venue form.
+/// Tap to drop the pin, "Set location" confirms; address is reverse-geocoded.
+class MapPickerPage extends StatefulWidget {
+  const MapPickerPage({super.key, this.initialLat, this.initialLng});
+
+  final double? initialLat;
+  final double? initialLng;
+
+  @override
+  State<MapPickerPage> createState() => _MapPickerPageState();
+}
+
+class _MapPickerPageState extends State<MapPickerPage> {
+  LatLng? _pos;
+  String _label = '';
+  bool _busy = false;
+  late final MapController _mapController = MapController();
+  final _searchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pos = (widget.initialLat != null && widget.initialLng != null)
+        ? LatLng(widget.initialLat!, widget.initialLng!)
+        : null;
+  }
+
+  Future<void> _pick(LatLng p) async {
+    setState(() {
+      _pos = p;
+      _busy = true;
+    });
+    final address = await _reverseGeocode(p.latitude, p.longitude);
+    if (mounted) {
+      setState(() {
+        _label = address;
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _search() async {
+    final q = _searchCtrl.text.trim();
+    if (q.isEmpty) return;
+    setState(() => _searching = true);
+    final results = await _searchPlaces(q);
+    if (!mounted) return;
+    setState(() {
+      _results = results;
+      _searching = false;
+    });
+  }
+
+  void _applyResult(Map<String, dynamic> r) {
+    final lat = double.parse(r['lat'] as String);
+    final lon = double.parse(r['lon'] as String);
+    final p = LatLng(lat, lon);
+    _mapController.move(p, 16);
+    _results = [];
+    _searchCtrl.clear();
+    _pick(p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pin venue location'),
+      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _pos ?? _defaultCenter,
+              initialZoom: _pos != null ? 16 : 11,
+              onTap: (_, p) => _pick(p),
+            ),
+            children: [
+              TileLayer(urlTemplate: _tileUrl, userAgentPackageName: 'com.sportsphere.app'),
+              MarkerLayer(
+                markers: [
+                  if (_pos != null)
+                    Marker(
+                      point: _pos!,
+                      width: 26,
+                      height: 26,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFFF6A13),
+                          border: Border.all(color: const Color(0xFF0D0D0D), width: 3),
+                          boxShadow: [BoxShadow(color: const Color(0x73FF6A13), blurRadius: 8, spreadRadius: 2)],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          // Address search bar (top) — jumps the pin to the best match.
+          Positioned(
+            left: 12, right: 12, top: 12,
+            child: Column(children: [
+              TextField(
+                controller: _searchCtrl,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _search(),
+                decoration: InputDecoration(
+                  hintText: 'Search address or place',
+                  prefixIcon: const Icon(Icons.search, size: 22),
+                  suffixIcon: _searching
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : null,
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              if (_results.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final r in _results)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.place_outlined, size: 20),
+                          title: Text('${r['display_name'] ?? ''}',
+                              maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5)),
+                          onTap: () => _applyResult(r),
+                        ),
+                    ],
+                  ),
+                ),
+            ]),
+          ),
+          Positioned(
+            left: 12, right: 12, bottom: 12,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: _busy
+                      ? const Row(children: [
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(width: 10),
+                          Text('Looking up address...'),
+                        ])
+                      : Text(
+                          _label.isEmpty
+                              ? (_pos == null ? 'Tap the map to drop the pin' : '${_pos!.latitude.toStringAsFixed(6)}, ${_pos!.longitude.toStringAsFixed(6)}')
+                              : _label,
+                          style: const TextStyle(fontSize: 12.5, color: Colors.black87),
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        minimumSize: const Size(0, 46),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                      onPressed: (_pos == null || _busy)
+                          ? null
+                          : () => Navigator.pop(context, {
+                                'location': _label.isEmpty ? '${_pos!.latitude.toStringAsFixed(6)}, ${_pos!.longitude.toStringAsFixed(6)}' : _label,
+                                'lat': _pos!.latitude,
+                                'lng': _pos!.longitude,
+                              }),
+                      child: const Text('Set location'),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class VenuesAdminPage extends StatefulWidget {
   const VenuesAdminPage({super.key});
@@ -86,6 +342,8 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
                               ]),
                               const SizedBox(height: 4),
                               Text('${v['location'] ?? '-'}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
                               const SizedBox(height: 8),
                               Text(
@@ -123,6 +381,9 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
     final locCtrl = TextEditingController(text: '${editing?['location'] ?? ''}');
     final capCtrl = TextEditingController(text: '${editing?['capacity'] ?? ''}');
     String status = editing != null ? '${editing['status']}' : 'Active';
+    double? lat = (editing?['lat'] as num?)?.toDouble();
+    double? lng = (editing?['lng'] as num?)?.toDouble();
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -149,6 +410,43 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
               ],
               onChanged: (v) => setM(() => status = v ?? 'Active'),
             ),
+            const SizedBox(height: 12),
+            // Map launcher: opens the full-screen OSM picker, comes back
+            // with address + coordinates which fill the Location field.
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              icon: const Icon(Icons.map_outlined, size: 20),
+              label: Text(
+                (lat != null && lng != null)
+                    ? 'Pinned: ${lat!.toStringAsFixed(4)}, ${lng!.toStringAsFixed(4)}'
+                    : 'Pin on map',
+              ),
+              onPressed: () async {
+                final r = await Navigator.push<Map<String, dynamic>>(
+                  ctx,
+                  MaterialPageRoute(builder: (_) => MapPickerPage(initialLat: lat, initialLng: lng)),
+                );
+                if (r != null) {
+                  setM(() {
+                    lat = r['lat'] as double;
+                    lng = r['lng'] as double;
+                    locCtrl.text = r['location'] as String;
+                  });
+                }
+              },
+            ),
+            if (lat != null && lng != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setM(() {
+                    lat = null;
+                    lng = null;
+                    locCtrl.clear();
+                  }),
+                  child: const Text('Clear pin'),
+                ),
+              ),
           ]),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -169,6 +467,8 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
         'location': locCtrl.text.trim().isEmpty ? null : locCtrl.text.trim(),
         'capacity': capCtrl.text.isEmpty ? null : num.tryParse(capCtrl.text),
         'status': status,
+        'lat': lat,
+        'lng': lng,
       };
       if (editing != null) {
         await client.from('venues').update(payload).eq('id', editing['id']);

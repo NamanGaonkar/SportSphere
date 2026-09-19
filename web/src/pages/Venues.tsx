@@ -16,6 +16,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { supabase } from '../lib/supabase'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
+import LocationPicker from '../components/LocationPicker'
 
 type Venue = {
   id: string
@@ -25,10 +26,12 @@ type Venue = {
   status: string
   indoor_outdoor: string | null
   facility_details: string | null
+  lat: number | null
+  lng: number | null
   venue_bookings: { count: number }[] | null
 }
 
-const empty = { name: '', location: '', capacity: '', status: 'Active', indoor_outdoor: 'Outdoor', facility_details: '' }
+const empty = { name: '', location: '', capacity: '', status: 'Active', indoor_outdoor: 'Outdoor', facility_details: '', lat: null as number | null, lng: null as number | null }
 
 export default function Venues() {
   const [rows, setRows] = useState<Venue[]>([])
@@ -60,6 +63,8 @@ export default function Venues() {
       status: form.status,
       indoor_outdoor: form.indoor_outdoor,
       facility_details: form.facility_details || null,
+      lat: form.lat,
+      lng: form.lng,
     }
     const { error } = editing
       ? await supabase.from('venues').update(payload).eq('id', editing)
@@ -86,6 +91,8 @@ export default function Venues() {
       status: v.status,
       indoor_outdoor: v.indoor_outdoor ?? 'Outdoor',
       facility_details: v.facility_details ?? '',
+      lat: v.lat,
+      lng: v.lng,
     })
     setShowForm(true)
   }
@@ -145,11 +152,11 @@ export default function Venues() {
         </Box>
       )}
 
-      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="md" fullWidth>
         <form onSubmit={save}>
           <DialogTitle>{editing ? 'Edit Venue' : 'Add Venue'}</DialogTitle>
           <DialogContent dividers>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, pt: 0.5 }}>
               <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
               <TextField label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} fullWidth />
               <TextField type="number" label="Capacity" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} fullWidth />
@@ -161,6 +168,17 @@ export default function Venues() {
               </TextField>
               <TextField label="Facility details" value={form.facility_details} onChange={(e) => setForm({ ...form, facility_details: e.target.value })} fullWidth />
             </Box>
+
+            {/* Map picker: tap to drop a pin — address + coordinates are
+                stored alongside the manual location text. */}
+            <Typography variant="subtitle2" sx={{ mt: 2.5, mb: 1, fontWeight: 700 }}>
+              Pin location on map
+            </Typography>
+            <LocationPicker
+              initial={{ lat: form.lat, lng: form.lng }}
+              onPick={(r) => setForm((f) => ({ ...f, location: r.location || f.location, lat: r.lat, lng: r.lng }))}
+            />
+
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>
           <DialogActions>

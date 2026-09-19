@@ -215,15 +215,15 @@ export default function Dashboard() {
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
-            <Box sx={{ width: '100%', height: 300 }}>
+            <Box sx={{ width: '100%', height: 320 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={teamsBySport}
                   layout="vertical"
-                  margin={{ left: 4, right: 36, top: 4, bottom: 4 }}
+                  margin={{ left: 4, right: 44, top: 4, bottom: 4 }}
                   // Bar bands align with the Y-axis ticks only when the axis
                   // padding matches on both ends.
-                  barCategoryGap="22%"
+                  barCategoryGap="18%"
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
                   <XAxis
@@ -268,9 +268,10 @@ export default function Dashboard() {
                     name="Teams"
                     fill={palette.primary}
                     radius={[0, 6, 6, 0]}
-                    // Fill the band dynamically instead of a fixed 16px bar:
-                    // 2 sports and 16 sports both look proportionate.
-                    maxBarSize={26}
+                    // Bars scale WITH the band (few sports -> thicker bars,
+                    // many sports -> thin) instead of a fixed cap that left
+                    // the plot mostly empty.
+                    maxBarSize={42}
                   >
                     <LabelList dataKey="teams" position="right" fontSize={11} fill={palette.black} fontWeight={700} />
                   </Bar>
