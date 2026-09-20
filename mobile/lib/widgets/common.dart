@@ -874,7 +874,7 @@ class VBars extends StatelessWidget {
   Widget build(BuildContext context) {
     if (points.isEmpty) return const EmptyState('No attendance recorded yet.');
     const yGutter = 34.0; // left labels: 100 / 50 / 0
-    const xLabelH = 38.0; // bottom band for the angled day labels
+    const xLabelH = 40.0; // bottom band for the angled day labels
     final valueSlot = showValueLabels ? 18.0 : 2.0; // space reserved above bars
     final plotH = (height - xLabelH - valueSlot).clamp(60.0, 260.0);
     final barArea = plotH - 2; // hairpin so a 100% bar never overflows
@@ -956,23 +956,30 @@ class VBars extends StatelessWidget {
         ],
       );
 
-      // Angled day labels (web's -40° treatment): end-anchored at the tick
-      // and swinging down-left, so full "16 Sep" labels stay readable even
-      // on a 30-bar dense axis.
+      // Angled day labels (web's -40° treatment). OverflowBox decouples the
+      // label from the ~10px slot so "16 Sep" keeps its natural width — the
+      // previous version let the slot width constrain the Text, which
+      // WRAPPED it to two lines and rotated it into an unreadable smear.
+      // Each label pivots at its slot's top-right corner (= its bar's tick,
+      // like web textAnchor="end") and sweeps down-left without clipping.
       final labels = Padding(
         padding: const EdgeInsets.only(left: yGutter + 4),
         child: SizedBox(
           height: xLabelH,
           child: slots(
             (i) => hasTick(i)
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Align(
+                ? OverflowBox(
+                    maxWidth: double.infinity,
+                    alignment: Alignment.topRight,
+                    child: Transform.rotate(
+                      angle: -0.7, // ~ -40°, same as the web charts
                       alignment: Alignment.topRight,
-                      child: Transform.rotate(
-                        angle: -0.62, // ~ -35°
-                        alignment: Alignment.topRight,
-                        child: Text(points[i].label, style: _axisStyle),
+                      child: Text(
+                        points[i].label,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.visible,
+                        style: _axisStyle,
                       ),
                     ),
                   )
