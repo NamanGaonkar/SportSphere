@@ -21,9 +21,80 @@ const TILE_ATTR =
 // Default center: Bengaluru, India.
 const DEFAULT_CENTER: [number, number] = [12.9716, 77.5946]
 
-// Nominatim requires an identifying Referer (browsers send it) — the same
-// policy the mobile app satisfies with its User-Agent header.
+// Geocoding stack: Photon (Komoot) first — it is built for browser apps,
+// CORS-native and does not throttle web origins the way Nominatim's usage
+// policy does (Nominatim 403s browser traffic after a burst, which made
+// the search silently return nothing). Nominatim stays as fallback.
 const GEO_HEADERS = { Accept: 'application/json' }
+
+type GeoResult = { display_name: string; lat: string; lon: string }
+
+type PhotonFeature = {
+  geometry: { coordinates: [number, number] } // [lon, lat]
+  properties: {
+    name?: string
+    street?: string
+    housenumber?: string
+    postcode?: string
+    city?: string
+    county?: string
+    state?: string
+    country?: string
+  }
+}
+
+function photonLabel(p: PhotonFeature['properties']): string {
+  return [p.name, p.street, p.city, p.state, p.country]
+    .filter((x): x is string => !!x && x.length > 0)
+    .join(', ')
+}
+
+/** Photon search → GeoJSON; returns empty list when nothing matches. */
+async function photonSearch(q: string): Promise<GeoResult[]> {
+  const res = await fetch(`https://photon.komoot.io/api/?limit=5&q=${encodeURIComponent(q)}`, {
+    headers: GEO_HEADERS,
+  })
+  const j = (await res.json()) as { features?: PhotonFeature[] }
+  return (j.features ?? []).map((f) => ({
+    display_name: photonLabel(f.properties),
+    lat: String(f.geometry.coordinates[1]),
+    lon: String(f.geometry.coordinates[0]),
+  }))
+}
+
+/** Nominatim search fallback (same API the mobile app uses). */
+async function nominatimSearch(q: string): Promise<GeoResult[]> {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
+    { headers: GEO_HEADERS },
+  )
+  return (await res.json()) as GeoResult[]
+}
+
+/** Reverse geocode: Photon first, Nominatim fallback, coordinates last. */
+async function reverseLookup(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`, {
+      headers: GEO_HEADERS,
+    })
+    const j = (await res.json()) as { features?: PhotonFeature[] }
+    const label = j.features?.[0] ? photonLabel(j.features[0].properties) : ''
+    if (label) return label
+  } catch {
+    /* fall through */
+  }
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      { headers: GEO_HEADERS },
+    )
+    const j = (await res.json()) as { display_name?: string }
+    if (j.display_name) return j.display_name
+  } catch {
+    /* fall through */
+  }
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+}
 
 // Small orange dot marker so the pin matches the brand palette.
 const pin = L.divIcon({
@@ -50,8 +121,6 @@ function FlyTo({ target }: { target: [number, number] | null }) {
   }, [target, map])
   return null
 }
-
-type GeoResult = { display_name: string; lat: string; lon: string }
 
 export type LocationPickerResult = { location: string; lat: number | null; lng: number | null }
 
@@ -85,21 +154,10 @@ export default function LocationPicker({
 
   async function reverseGeocode(lat: number, lng: number) {
     setBusy(true)
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-        { headers: GEO_HEADERS },
-      )
-      const j = (await res.json()) as { display_name?: string }
-      setLabel(j.display_name ?? '')
-      onPick({ location: j.display_name ?? `${lat.toFixed(6)}, ${lng.toFixed(6)}`, lat, lng })
-    } catch {
-      // Nominatim can rate-limit; coordinates are still valid data.
-      setLabel('')
-      onPick({ location: `${lat.toFixed(6)}, ${lng.toFixed(6)}`, lat, lng })
-    } finally {
-      setBusy(false)
-    }
+    const location = await reverseLookup(lat, lng)
+    setLabel(location)
+    onPick({ location, lat, lng })
+    setBusy(false)
   }
 
   function pick(lat: number, lng: number) {
@@ -118,12 +176,12 @@ export default function LocationPicker({
     const id = ++reqId.current
     setSearching(true)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(term)}`,
-        { headers: GEO_HEADERS },
-      )
+      // Photon first; Nominatim only if Photon returns nothing (it may be
+      // rate-limiting this browser — that was the "no results" bug).
+      let found = await photonSearch(term)
+      if (found.length === 0) found = await nominatimSearch(term)
       if (id !== reqId.current) return // a newer keystroke superseded this one
-      setResults(((await res.json()) as GeoResult[]) ?? [])
+      setResults(found)
     } catch {
       if (id === reqId.current) setResults([])
     } finally {
