@@ -405,7 +405,7 @@ class _DashboardHomeState extends State<DashboardHome> {
   int _tournaments = 0;
   List<DbRow> _matches = [];
   List<DbRow> _teamRows = [];
-  List<({String day, num pct})> _attendance = [];
+  List<DayPoint> _attendance = [];
   List<DbRow> _payroll = [];
   List<DbRow> _equip = [];
   List<DbRow> _med = [];
@@ -521,7 +521,8 @@ class _DashboardHomeState extends State<DashboardHome> {
         _teams = _teamRows.length;
         _tournaments = (results[3] as List).length;
         _matches = (results[4] as List).cast<DbRow>();
-        _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
+        // Full DayPoints kept — charts need marked/present/total, not just pct.
+        _attendance = window;
         _name = '${profile?['full_name'] ?? ''}';
         _role = '${profile?['role'] ?? ''}';
         _payroll = (results[8] as List).cast<DbRow>();
@@ -633,9 +634,9 @@ class _DashboardHomeState extends State<DashboardHome> {
           _Card(
             title: 'Attendance - Last 7 Days (%)',
             child: VBars(
-              [for (final a in _attendance) DayPoint('', a.day, 0, 0, a.pct.toInt())],
+              _attendance,
               barWidth: 24,
-              height: 175,
+              height: 190,
             ),
           ),
           const SizedBox(height: 16),

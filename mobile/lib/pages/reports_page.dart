@@ -21,7 +21,7 @@ class _ReportsPageState extends State<ReportsPage> {
   bool _loading = true;
   List<MapEntry<String, int>> _athleteSports = [];
   List<MapEntry<String, int>> _teamSports = [];
-  List<({String day, num pct})> _attendance = [];
+  List<DayPoint> _attendance = [];
   List<DbRow> _awards = [];
   RealtimeChannel? _c1;
   RealtimeChannel? _c2;
@@ -93,7 +93,8 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() {
         _athleteSports = am.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
         _teamSports = tm.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-        _attendance = [for (final p in window) (day: p.label, pct: p.pct)];
+        // Full DayPoints kept — charts need marked/present/total, not just pct.
+        _attendance = window;
         _awards = (results[4] as List).cast<DbRow>();
         _loading = false;
       });
@@ -129,9 +130,9 @@ class _ReportsPageState extends State<ReportsPage> {
           SectionCard(
             title: 'Attendance Rate - Last 30 Days (%)',
             child: VBars(
-              [for (final a in _attendance) DayPoint('', a.day, 0, 0, a.pct.toInt())],
+              _attendance,
               barWidth: 9,
-              height: 200,
+              height: 210,
               // 30 bars: suppress the per-bar % (overlap), label every 3rd
               // day — same cadence as the web chart.
               showValueLabels: false,
@@ -149,9 +150,11 @@ class _ReportsPageState extends State<ReportsPage> {
               final sportsPlayed =
                   _athleteSports.where((e) => e.key != 'Unassigned').length;
               final entries = _athleteSports.fold<int>(0, (s, e) => s + e.value.toInt());
-              final avgAtt = _attendance.isEmpty
+              // Average over days that actually have marks (web parity).
+              final markedDays = _attendance.where((d) => d.marked).toList();
+              final avgAtt = markedDays.isEmpty
                   ? 0
-                  : _attendance.fold<int>(0, (s, e) => s + e.pct.toInt()) ~/ _attendance.length;
+                  : markedDays.fold<int>(0, (s, d) => s + d.pct) ~/ markedDays.length;
               return Wrap(
                 spacing: gap,
                 runSpacing: gap,

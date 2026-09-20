@@ -850,84 +850,200 @@ class HBars extends StatelessWidget {
   }
 }
 
-/// Vertical daily bars for the attendance chart (0-100%). Fixed scaling:
-/// 0-100% axis with 25% gridlines, bar heights proportional to the plot
-/// area (not to each other), rotated day labels like the web charts.
+/// Vertical daily bars for the attendance chart (0-100% scale).
+/// A real chart, not floating sticks: y-gridlines with 0/50/100 labels,
+/// bars sized to fill the card width (30-day charts no longer need the
+/// cramped sideways scroll), dashed gaps for unmarked days, and a tap
+/// tooltip on every bar showing the exact day / rate / marks.
 class VBars extends StatelessWidget {
   final List<DayPoint> points;
-  final double barWidth;
+  final double barWidth; // preferred bar width when space allows
   final double height;
-  /// Show a value label above every bar (off for dense 30-day charts).
+  /// Show a % label above every bar (sparse charts like the 7-day view).
   final bool showValueLabels;
   /// Label every Nth day on the x-axis (0 = all). Dense charts use 3.
   final int labelEvery;
-  const VBars(this.points, {super.key, this.barWidth = 22, this.height = 170, this.showValueLabels = true, this.labelEvery = 0});
+  const VBars(this.points,
+      {super.key,
+      this.barWidth = 22,
+      this.height = 170,
+      this.showValueLabels = true,
+      this.labelEvery = 0});
 
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) return const EmptyState('No attendance recorded yet.');
-    const plotH = 110.0; // pixel height of the 0-100% plot area
-    return SizedBox(
-      height: height,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (var i = 0; i < points.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: SizedBox(
-                  width: barWidth + 14,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+    const yGutter = 36.0; // left labels: 100 / 50 / 0
+    const xLabelH = 18.0; // bottom day labels
+    final valueSlot = showValueLabels ? 18.0 : 2.0; // space reserved above bars
+    final plotH = (height - xLabelH - valueSlot).clamp(60.0, 260.0);
+    final barArea = plotH - 2; // hairpin so a 100% bar never overflows
+
+    return LayoutBuilder(builder: (context, box) {
+      // Fill the card width; only scroll when slots get inhumanly small.
+      final slot = (box.maxWidth - yGutter) / points.length;
+      final scroll = slot < 10;
+      final usedSlot = scroll ? 13.0 : slot;
+      final bar = (usedSlot * 0.62).clamp(3.0, barWidth);
+
+      final plot = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: yGutter,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: const [
+                Text('100', style: _axisStyle),
+                Text('50', style: _axisStyle),
+                Text('0', style: _axisStyle),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Gridlines: 100% / 50% / baseline.
+                Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: Container(height: 1, color: const Color(0xFFE4E4DC))),
+                Positioned(
+                    left: 0,
+                    right: 0,
+                    top: plotH / 2,
+                    child: Container(height: 1, color: const Color(0xFFE4E4DC))),
+                Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(height: 1, color: const Color(0xFFC9C9C0))),
+                Positioned.fill(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (showValueLabels)
-                        Text(points[i].marked ? '${points[i].pct}%' : '-',
-                            style: const TextStyle(
-                                fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black54))
-                      else if (points[i].marked && points[i].pct >= 100)
-                        // Dense mode: only flag the extremes so the top never
-                        // looks blank, but never prints 30 overlapping labels.
-                        Text('100%', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.black45))
-                      else
-                        const SizedBox(height: 12),
-                      const SizedBox(height: 4),
-                      if (points[i].marked)
-                        Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            width: barWidth,
-                            // pct/100 * plotH — true percentage scale.
-                            height: (points[i].pct / 100) * plotH,
-                            decoration: const BoxDecoration(
-                              color: Brand.primary,
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
-                            ),
-                          ),
-                        )
-                      else
-                        // Unmarked day: a small dash, never a bar.
-                        Container(width: barWidth, height: 2, color: Colors.black12),
-                      const SizedBox(height: 5),
-                      // X-axis: label every Nth day (cadence fixed from the
-                      // start of the window, like web interval={2}) so ticks
-                      // are evenly spaced and never collide.
-                      Text(
-                          (labelEvery <= 0 || i % labelEvery == 0)
-                              ? points[i].label
-                              : '',
-                          overflow: TextOverflow.clip,
-                          style: const TextStyle(fontSize: 9.5, color: Colors.black45)),
+                      for (var i = 0; i < points.length; i++)
+                        _BarSlot(
+                          p: points[i],
+                          slot: usedSlot,
+                          bar: bar,
+                          plotH: plotH,
+                          barArea: barArea,
+                          valueSlot: valueSlot,
+                          showValue: showValueLabels,
+                        ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+
+      final labels = SizedBox(
+        height: xLabelH,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (var i = 0; i < points.length; i++)
+              SizedBox(
+                width: usedSlot,
+                child: Text(
+                  (labelEvery <= 0 || i % labelEvery == 0) ? points[i].label : '',
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.clip,
+                  style: _axisStyle,
                 ),
               ),
           ],
         ),
+      );
+
+      return SizedBox(
+        height: height,
+        child: scroll
+            ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [plot, labels],
+                ),
+              )
+            : Column(children: [Expanded(child: plot), labels]),
+      );
+    });
+  }
+}
+
+const _axisStyle = TextStyle(
+    fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black45);
+
+/// One day's column inside the plot: value label, bar (or dash gap), all
+/// inside a tap tooltip with the exact numbers for that day.
+class _BarSlot extends StatelessWidget {
+  final DayPoint p;
+  final double slot;
+  final double bar;
+  final double plotH;
+  final double barArea;
+  final double valueSlot;
+  final bool showValue;
+  const _BarSlot({
+    required this.p,
+    required this.slot,
+    required this.bar,
+    required this.plotH,
+    required this.barArea,
+    required this.valueSlot,
+    required this.showValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tip = p.marked
+        ? '${p.label} - ${p.pct}% (${p.present} of ${p.total} marked)'
+        : '${p.label} - no marks recorded';
+    final Widget column = SizedBox(
+      width: slot,
+      height: plotH,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          SizedBox(
+            height: valueSlot,
+            child: showValue && p.marked
+                ? Text('${p.pct}',
+                    style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54))
+                : null,
+          ),
+          if (!p.marked)
+            // Unmarked day: a small dash, never a bar (never 0%, never 100%).
+            Container(width: bar, height: 2, color: Colors.black12)
+          else
+            Container(
+              width: bar,
+              // True percentage scale against the fixed plot area.
+              height: (p.pct / 100 * barArea).clamp(2.0, barArea),
+              decoration: BoxDecoration(
+                color: p.pct == 0
+                    ? Brand.primary.withValues(alpha: 0.30) // marked, all absent
+                    : Brand.primary,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+            ),
+        ],
       ),
     );
+    return Tooltip(message: tip, triggerMode: TooltipTriggerMode.tap, child: column);
   }
 }
 
