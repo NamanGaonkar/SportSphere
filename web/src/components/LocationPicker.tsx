@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import Box from '@mui/material/Box'
@@ -21,6 +21,10 @@ const TILE_ATTR =
 // Default center: Bengaluru, India.
 const DEFAULT_CENTER: [number, number] = [12.9716, 77.5946]
 
+// Nominatim requires an identifying Referer (browsers send it) — the same
+// policy the mobile app satisfies with its User-Agent header.
+const GEO_HEADERS = { Accept: 'application/json' }
+
 // Small orange dot marker so the pin matches the brand palette.
 const pin = L.divIcon({
   className: 'sportsphere-map-pin',
@@ -38,7 +42,7 @@ function ClickCapture({ onPick }: { onPick: (lat: number, lng: number) => void }
   return null
 }
 
-/** Smoothly flies the map when the pin moves via search results. */
+/** Smoothly flies the map whenever the pin target changes. */
 function FlyTo({ target }: { target: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
@@ -53,10 +57,11 @@ export type LocationPickerResult = { location: string; lat: number | null; lng: 
 
 /**
  * Map + geocode location picker used in the Venue form (web).
- * - Click the map to drop the pin; Nominatim reverse-geocodes the address.
- * - Search box finds addresses/places and flies the pin there.
- * (Note: browsers do not allow setting User-Agent on fetch — the browser
- * sends its own, which satisfies Nominatim's policy on the web.)
+ * Mirrors the mobile picker's behavior:
+ * - Type to search: results appear automatically (debounced) while typing.
+ * - Tap a result: the pin flies there AND the full address is resolved via
+ *   reverse geocoding (same lookup the phone runs after choosing a result).
+ * - Click the map: pin drops, address reverse-geocodes.
  */
 export default function LocationPicker({
   initial,
@@ -74,6 +79,7 @@ export default function LocationPicker({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<GeoResult[]>([])
   const [searching, setSearching] = useState(false)
+  const reqId = useRef(0)
 
   const center = useMemo<[number, number]>(() => pos ?? DEFAULT_CENTER, [pos])
 
@@ -82,7 +88,7 @@ export default function LocationPicker({
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-        { headers: { Accept: 'application/json' } },
+        { headers: GEO_HEADERS },
       )
       const j = (await res.json()) as { display_name?: string }
       setLabel(j.display_name ?? '')
@@ -98,39 +104,54 @@ export default function LocationPicker({
 
   function pick(lat: number, lng: number) {
     const p: [number, number] = [lat, lng]
+    setResults([])
     setPos(p)
     void reverseGeocode(lat, lng)
   }
 
-  async function search() {
-    const q = query.trim()
-    if (!q) return
+  async function search(q: string) {
+    const term = q.trim()
+    if (!term) {
+      setResults([])
+      return
+    }
+    const id = ++reqId.current
     setSearching(true)
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
-        { headers: { Accept: 'application/json' } },
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(term)}`,
+        { headers: GEO_HEADERS },
       )
-      setResults((await res.json()) as GeoResult[])
+      if (id !== reqId.current) return // a newer keystroke superseded this one
+      setResults(((await res.json()) as GeoResult[]) ?? [])
     } catch {
-      setResults([])
+      if (id === reqId.current) setResults([])
     } finally {
-      setSearching(false)
+      if (id === reqId.current) setSearching(false)
     }
   }
 
-  function applyResult(r: GeoResult) {
+  // Debounced auto-search while typing (phone parity) — 500ms after the
+  // last keystroke, so results appear without pressing Enter.
+  useEffect(() => {
+    const t = setTimeout(() => void search(query), 500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
+  async function applyResult(r: GeoResult) {
     const p: [number, number] = [Number(r.lat), Number(r.lon)]
+    setQuery(r.display_name)
     setResults([])
-    setQuery('')
     setPos(p)
-    setLabel(r.display_name)
-    onPick({ location: r.display_name, lat: p[0], lng: p[1] })
+    // Resolve the address through the same reverse-geocode path the phone
+    // uses after picking a result — keeps label + pin in sync everywhere.
+    await reverseGeocode(p[0], p[1])
   }
 
   return (
     <Box>
-      {/* Address search — was missing; mirrors the mobile picker */}
+      {/* Address search — auto-suggests while typing, same as the phone */}
       <Box sx={{ position: 'relative', mb: 1 }}>
         <TextField
           size="small"
@@ -141,7 +162,7 @@ export default function LocationPicker({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              void search()
+              void search(query)
             }
           }}
           slotProps={{
@@ -166,7 +187,7 @@ export default function LocationPicker({
           >
             <List dense disablePadding>
               {results.map((r, i) => (
-                <ListItemButton key={i} onClick={() => applyResult(r)}>
+                <ListItemButton key={i} onClick={() => void applyResult(r)}>
                   <ListItemText
                     primary={r.display_name}
                     slotProps={{ primary: { sx: { fontSize: 12.5 } } }}
@@ -202,7 +223,7 @@ export default function LocationPicker({
               ? label
               : pos
                 ? `${pos[0].toFixed(6)}, ${pos[1].toFixed(6)}`
-                : 'Tap the map or search to set the venue location'}
+                : 'Search or tap the map to set the venue location'}
         </Typography>
         {pos && (
           <Button
@@ -211,6 +232,7 @@ export default function LocationPicker({
             onClick={() => {
               setPos(null)
               setLabel('')
+              setQuery('')
               onPick({ location: '', lat: null, lng: null })
             }}
           >

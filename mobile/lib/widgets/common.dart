@@ -873,18 +873,33 @@ class VBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) return const EmptyState('No attendance recorded yet.');
-    const yGutter = 36.0; // left labels: 100 / 50 / 0
-    const xLabelH = 18.0; // bottom day labels
+    const yGutter = 34.0; // left labels: 100 / 50 / 0
+    const xLabelH = 38.0; // bottom band for the angled day labels
     final valueSlot = showValueLabels ? 18.0 : 2.0; // space reserved above bars
     final plotH = (height - xLabelH - valueSlot).clamp(60.0, 260.0);
     final barArea = plotH - 2; // hairpin so a 100% bar never overflows
+    final n = points.length;
+
+    // Tick cadence anchored to the NEWEST day (index n-1 = today) so the
+    // right-most column always carries its date, plus the oldest column.
+    // (Labeling from the oldest side was dropping today's label entirely.)
+    bool hasTick(int i) =>
+        labelEvery <= 0 || i == n - 1 || i == 0 || (n - 1 - i) % labelEvery == 0;
 
     return LayoutBuilder(builder: (context, box) {
       // Fill the card width; only scroll when slots get inhumanly small.
-      final slot = (box.maxWidth - yGutter) / points.length;
+      final slot = (box.maxWidth - yGutter - 4) / n;
       final scroll = slot < 10;
-      final usedSlot = scroll ? 13.0 : slot;
+      final usedSlot = scroll ? 12.0 : slot;
       final bar = (usedSlot * 0.62).clamp(3.0, barWidth);
+
+      // Deterministic slot layout (fixed widths, left-aligned): bars and
+      // labels use the SAME construction, so ticks sit exactly under their
+      // bars — spaceEvenly drift was making labels wander off their bars.
+      Widget slots(Widget Function(int i) child) => Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [for (var i = 0; i < n; i++) SizedBox(width: usedSlot, child: child(i))],
+          );
 
       final plot = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -923,21 +938,16 @@ class VBars extends StatelessWidget {
                     bottom: 0,
                     child: Container(height: 1, color: const Color(0xFFC9C9C0))),
                 Positioned.fill(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (var i = 0; i < points.length; i++)
-                        _BarSlot(
-                          p: points[i],
-                          slot: usedSlot,
-                          bar: bar,
-                          plotH: plotH,
-                          barArea: barArea,
-                          valueSlot: valueSlot,
-                          showValue: showValueLabels,
-                        ),
-                    ],
+                  child: slots(
+                    (i) => _BarSlot(
+                      p: points[i],
+                      slot: usedSlot,
+                      bar: bar,
+                      plotH: plotH,
+                      barArea: barArea,
+                      valueSlot: valueSlot,
+                      showValue: showValueLabels,
+                    ),
                   ),
                 ),
               ],
@@ -946,22 +956,28 @@ class VBars extends StatelessWidget {
         ],
       );
 
-      final labels = SizedBox(
-        height: xLabelH,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            for (var i = 0; i < points.length; i++)
-              SizedBox(
-                width: usedSlot,
-                child: Text(
-                  (labelEvery <= 0 || i % labelEvery == 0) ? points[i].label : '',
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.clip,
-                  style: _axisStyle,
-                ),
-              ),
-          ],
+      // Angled day labels (web's -40° treatment): end-anchored at the tick
+      // and swinging down-left, so full "16 Sep" labels stay readable even
+      // on a 30-bar dense axis.
+      final labels = Padding(
+        padding: const EdgeInsets.only(left: yGutter + 4),
+        child: SizedBox(
+          height: xLabelH,
+          child: slots(
+            (i) => hasTick(i)
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Transform.rotate(
+                        angle: -0.62, // ~ -35°
+                        alignment: Alignment.topRight,
+                        child: Text(points[i].label, style: _axisStyle),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
         ),
       );
 
@@ -982,7 +998,7 @@ class VBars extends StatelessWidget {
 }
 
 const _axisStyle = TextStyle(
-    fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black45);
+    fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.black54);
 
 /// One day's column inside the plot: value label, bar (or dash gap), all
 /// inside a tap tooltip with the exact numbers for that day.
