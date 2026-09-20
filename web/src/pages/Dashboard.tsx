@@ -14,7 +14,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid, LabelList,
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { palette } from '../theme'
 
@@ -215,68 +215,67 @@ export default function Dashboard() {
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
-            <Box sx={{ width: '100%', height: 320 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={teamsBySport}
-                  layout="vertical"
-                  margin={{ left: 4, right: 44, top: 4, bottom: 4 }}
-                  // Bar bands align with the Y-axis ticks only when the axis
-                  // padding matches on both ends.
-                  barCategoryGap="18%"
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke={palette.border} horizontal={false} />
-                  <XAxis
-                    type="number"
-                    stroke={palette.textMuted}
-                    fontSize={11}
-                    tickLine={false}
-                    allowDecimals={false}
-                    // Scale to the data with one step of headroom so the longest
-                    // bar never touches the edge.
-                    domain={[0, (max: number) => Math.ceil(max + 1)]}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    stroke={palette.textMuted}
-                    fontSize={11}
-                    // Wider gutter + interval={0} so EVERY sport name renders
-                    // in full ("Football" was previously cut off / skipped).
-                    width={190}
-                    interval={0}
-                    tickLine={false}
-                    tickMargin={6}
-                    // Scale bar band to fill the plot height evenly.
-                    scale="band"
-                  />
-                  <RTooltip
-                    cursor={{ fill: 'rgba(255,106,19,0.08)' }}
-                    contentStyle={{
-                      background: palette.surface,
-                      border: `1px solid ${palette.border}`,
-                      borderRadius: 10,
-                      fontFamily: 'Lato, sans-serif',
-                    }}
-                    labelStyle={{ color: palette.black, fontWeight: 700 }}
-                    // "count : 4" reads wrong — the payload name is the series
-                    // key, so give it a proper label.
-                    formatter={(value) => [`${value} team${Number(value) === 1 ? '' : 's'}`, 'Teams']}
-                  />
-                  <Bar
-                    dataKey="teams"
-                    name="Teams"
-                    fill={palette.primary}
-                    radius={[0, 6, 6, 0]}
-                    // Bars scale WITH the band (few sports -> thicker bars,
-                    // many sports -> thin) instead of a fixed cap that left
-                    // the plot mostly empty.
-                    maxBarSize={42}
+            /* Hand-rolled bar list: label + track + value in one flex row.
+               The label and the bar live in the SAME element, so axis naming
+               and hover can never drift out of alignment (Recharts' vertical
+               band axis kept misaligning ticks vs cursor). */
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              {teamsBySport.map((s) => {
+                const max = Math.max(...teamsBySport.map((x) => x.teams), 1)
+                const pct = Math.max((s.teams / max) * 100, 6) // min 6% so a lone team is still visible
+                return (
+                  <Tooltip
+                    key={s.name}
+                    title={`${s.teams} team${s.teams === 1 ? '' : 's'} - ${s.name}`}
+                    arrow
+                    placement="top"
                   >
-                    <LabelList dataKey="teams" position="right" fontSize={11} fill={palette.black} fontWeight={700} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        py: 1,
+                        px: 1,
+                        borderRadius: 1.5,
+                        transition: 'background-color .15s',
+                        '&:hover': { bgcolor: 'rgba(255,106,19,0.08)' },
+                      }}
+                    >
+                      {/* Sport name — full text, one line, own fixed column */}
+                      <Typography
+                        sx={{
+                          width: 190,
+                          flexShrink: 0,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: palette.black,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {s.name}
+                      </Typography>
+                      {/* Bar track — fills the rest of the card width */}
+                      <Box sx={{ flex: 1, height: 22, borderRadius: 1, bgcolor: 'rgba(13,13,13,0.05)', overflow: 'hidden' }}>
+                        <Box
+                          sx={{
+                            width: `${pct}%`,
+                            height: '100%',
+                            borderRadius: 1,
+                            background: 'linear-gradient(90deg, #FF6A13, #FF8A42)',
+                          }}
+                        />
+                      </Box>
+                      {/* Count, pinned right so values line up in a column */}
+                      <Typography sx={{ width: 34, textAlign: 'right', fontSize: 13, fontWeight: 700, color: palette.black }}>
+                        {s.teams}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                )
+              })}
             </Box>
           )}
         </Section>

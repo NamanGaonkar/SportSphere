@@ -75,40 +75,89 @@ export default function Login() {
           opacity: 0.55,
         }}
       />
-      {/* Dark veil so text stays readable over the photo */}
+      {/* Dark veil so text stays readable over the photo —
+          uniform #0D0D0D hardening (80/60/40) keeps white and orange text
+          sharply legible without washing out. */}
       <Box
         sx={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(90deg, rgba(10,10,10,0.82) 0%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.35) 100%)',
+          background:
+            'linear-gradient(90deg, rgba(13,13,13,0.80) 0%, rgba(13,13,13,0.60) 45%, rgba(13,13,13,0.40) 100%)',
         }}
       />
 
-      {/* Brand panel */}
+      {/* Brand panel — vertically centered flex column that visually
+          balances the floating sign-in card on the right. */}
       <Box
         sx={{
           position: 'relative',
           zIndex: 1,
-          flex: { md: '0 0 44%' },
+          flex: { md: '0 0 52%' },
           color: 'common.white',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          px: { xs: 4, md: 8 },
-          py: { xs: 6, md: 0 },
+          alignItems: 'flex-start',
+          maxWidth: { md: 640 },
+          pl: { xs: 4, lg: 10 },
+          pr: { xs: 4, md: 2 },
+          py: { xs: 6, md: 6 },
         }}
       >
-        <Box component="img" src="/logo.png" alt="SportSphere" sx={{ width: 148, height: 'auto', mb: 2, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.6))' }} />
-        <Typography sx={{ fontSize: 22, fontWeight: 700, letterSpacing: 2 }}>
-          SPORT<span style={{ color: '#FF5500' }}>SPHERE</span>
+        {/* Logo lockup: 64px icon above the wordmark */}
+        <Box
+          component="img"
+          src="/logo.png"
+          alt="SportSphere"
+          sx={{
+            width: 64,
+            height: 64,
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.6))',
+          }}
+        />
+        <Typography sx={{ mt: 2, fontSize: 26, fontWeight: 800, letterSpacing: 2, lineHeight: 1 }}>
+          SPORT<span style={{ color: '#FF6A13' }}>SPHERE</span>
         </Typography>
-        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 2.4, mb: 3 }}>
-          ELEVATE EVERY GAME
+        {/* Eyebrow badge */}
+        <Typography
+          sx={{
+            mt: 1,
+            color: '#FF6A13',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Elevate every game
         </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.25, maxWidth: 460 }}>
+        {/* Headline — extra-bold, tight leading */}
+        <Typography
+          sx={{
+            mt: 6,
+            mb: 4,
+            fontSize: { xs: 34, lg: 48 },
+            fontWeight: 800,
+            lineHeight: 1.15,
+            color: '#FFFFFF',
+            maxWidth: 560,
+            textShadow: '0 2px 8px rgba(0,0,0,0.35)',
+          }}
+        >
           Sports organization management, in one place.
         </Typography>
-        <Typography sx={{ color: 'rgba(255,255,255,0.72)', mt: 2, maxWidth: 420, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+        <Typography
+          sx={{
+            color: '#E2E8F0',
+            fontSize: { xs: 15, lg: 18 },
+            lineHeight: 1.65,
+            fontWeight: 400,
+            maxWidth: 480,
+            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+          }}
+        >
           Manage athletes, coaches, teams, tournaments, venues and operations from a single
           platform built for clubs, academies and school sports bodies.
         </Typography>

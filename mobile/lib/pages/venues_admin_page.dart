@@ -23,7 +23,14 @@ Future<String> _reverseGeocode(double lat, double lng) async {
   try {
     final res = await http.get(
       Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lng'),
-      headers: {'Accept': 'application/json'},
+      // Nominatim REJECTS requests without an identifying User-Agent (403).
+      // Browsers send one automatically — Dart's http client doesn't —
+      // which is why search + address lookup silently failed on phones
+      // (falling back to raw coordinates) while the web app worked.
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'SportSphere/1.0 (sportsphere mobile app)',
+      },
     ).timeout(const Duration(seconds: 8));
     if (res.statusCode == 200) {
       final j = jsonDecode(res.body) as Map<String, dynamic>;
@@ -41,7 +48,10 @@ Future<List<Map<String, dynamic>>> _searchPlaces(String query) async {
     final res = await http.get(
       Uri.parse(
           'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${Uri.encodeComponent(query)}'),
-      headers: {'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'SportSphere/1.0 (sportsphere mobile app)',
+      },
     ).timeout(const Duration(seconds: 8));
     if (res.statusCode == 200) {
       final list = jsonDecode(res.body) as List;
@@ -169,7 +179,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
                           padding: EdgeInsets.all(10),
                           child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                         )
-                      : null,
+                      : IconButton(icon: const Icon(Icons.search, size: 22), onPressed: _search),
                   isDense: true,
                   filled: true,
                   fillColor: Colors.white,
@@ -416,11 +426,9 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
               icon: const Icon(Icons.map_outlined, size: 20),
-              label: Text(
-                (lat != null && lng != null)
-                    ? 'Pinned: ${lat!.toStringAsFixed(4)}, ${lng!.toStringAsFixed(4)}'
-                    : 'Pin on map',
-              ),
+              // Coordinates stay in the DB — the visible label is the
+              // human-readable address, same as the web app.
+              label: Text((lat != null && lng != null) ? 'Change pinned location' : 'Pin on map'),
               onPressed: () async {
                 final r = await Navigator.push<Map<String, dynamic>>(
                   ctx,
@@ -436,9 +444,18 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
               },
             ),
             if (lat != null && lng != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    locCtrl.text.trim().isNotEmpty
+                        ? locCtrl.text.trim()
+                        : '${lat!.toStringAsFixed(5)}, ${lng!.toStringAsFixed(5)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ),
+                TextButton(
                   onPressed: () => setM(() {
                     lat = null;
                     lng = null;
@@ -446,16 +463,31 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
                   }),
                   child: const Text('Clear pin'),
                 ),
-              ),
+              ]),
           ]),
+          // Cancel and Save are the SAME style pairing and height — the old
+          // text-only Cancel read as a footnote next to the filled button.
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () {
-                  if (nameCtrl.text.trim().isEmpty) return;
-                  Navigator.pop(ctx, true);
-                },
-                child: Text(editing == null ? 'Add' : 'Save')),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                  onPressed: () {
+                    if (nameCtrl.text.trim().isEmpty) return;
+                    Navigator.pop(ctx, true);
+                  },
+                  child: Text(editing == null ? 'Add' : 'Save'),
+                ),
+              ),
+            ]),
           ],
         ),
       ),

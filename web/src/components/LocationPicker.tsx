@@ -1,9 +1,16 @@
-import { useMemo, useState } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { useEffect, useMemo, useState } from 'react'
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Paper from '@mui/material/Paper'
+import List from '@mui/material/List'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemText from '@mui/material/ListItemText'
+import CircularProgress from '@mui/material/CircularProgress'
 import Typography from '@mui/material/Typography'
+import SearchIcon from '@mui/icons-material/Search'
 import 'leaflet/dist/leaflet.css'
 
 // OpenStreetMap tiles — free, no API key, no billing account required.
@@ -31,18 +38,31 @@ function ClickCapture({ onPick }: { onPick: (lat: number, lng: number) => void }
   return null
 }
 
+/** Smoothly flies the map when the pin moves via search results. */
+function FlyTo({ target }: { target: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (target) map.flyTo(target, 16, { duration: 0.6 })
+  }, [target, map])
+  return null
+}
+
+type GeoResult = { display_name: string; lat: string; lon: string }
+
 export type LocationPickerResult = { location: string; lat: number | null; lng: number | null }
 
 /**
- * Map + reverse-geocode location picker used in the Venue form (web).
- * Tap anywhere to drop the pin; the human-readable address is filled via
- * Nominatim (OSM's free reverse-geocoding service).
+ * Map + geocode location picker used in the Venue form (web).
+ * - Click the map to drop the pin; Nominatim reverse-geocodes the address.
+ * - Search box finds addresses/places and flies the pin there.
+ * (Note: browsers do not allow setting User-Agent on fetch — the browser
+ * sends its own, which satisfies Nominatim's policy on the web.)
  */
 export default function LocationPicker({
   initial,
   onPick,
 }: {
-  /** "lat,lng" string when editing a venue that already has coordinates. */
+  /** lat/lng when editing a venue that already has coordinates. */
   initial?: { lat: number | null; lng: number | null }
   onPick: (r: LocationPickerResult) => void
 }) {
@@ -51,6 +71,9 @@ export default function LocationPicker({
   )
   const [label, setLabel] = useState('')
   const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<GeoResult[]>([])
+  const [searching, setSearching] = useState(false)
 
   const center = useMemo<[number, number]>(() => pos ?? DEFAULT_CENTER, [pos])
 
@@ -79,8 +102,81 @@ export default function LocationPicker({
     void reverseGeocode(lat, lng)
   }
 
+  async function search() {
+    const q = query.trim()
+    if (!q) return
+    setSearching(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
+        { headers: { Accept: 'application/json' } },
+      )
+      setResults((await res.json()) as GeoResult[])
+    } catch {
+      setResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function applyResult(r: GeoResult) {
+    const p: [number, number] = [Number(r.lat), Number(r.lon)]
+    setResults([])
+    setQuery('')
+    setPos(p)
+    setLabel(r.display_name)
+    onPick({ location: r.display_name, lat: p[0], lng: p[1] })
+  }
+
   return (
     <Box>
+      {/* Address search — was missing; mirrors the mobile picker */}
+      <Box sx={{ position: 'relative', mb: 1 }}>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Search address or place"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              void search()
+            }
+          }}
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+              endAdornment: searching ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null,
+            },
+          }}
+        />
+        {results.length > 0 && (
+          <Paper
+            elevation={3}
+            sx={{
+              position: 'absolute',
+              zIndex: 1300,
+              left: 0,
+              right: 0,
+              mt: 0.5,
+              maxHeight: 220,
+              overflow: 'auto',
+            }}
+          >
+            <List dense disablePadding>
+              {results.map((r, i) => (
+                <ListItemButton key={i} onClick={() => applyResult(r)}>
+                  <ListItemText
+                    primary={r.display_name}
+                    slotProps={{ primary: { sx: { fontSize: 12.5 } } }}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </Paper>
+        )}
+      </Box>
       <Box
         sx={{
           height: 260,
@@ -94,6 +190,7 @@ export default function LocationPicker({
         <MapContainer center={center} zoom={pos ? 16 : 11} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
           <TileLayer url={TILE_URL} attribution={TILE_ATTR} />
           <ClickCapture onPick={pick} />
+          <FlyTo target={pos} />
           {pos && <Marker position={pos} icon={pin} />}
         </MapContainer>
       </Box>
@@ -105,7 +202,7 @@ export default function LocationPicker({
               ? label
               : pos
                 ? `${pos[0].toFixed(6)}, ${pos[1].toFixed(6)}`
-                : 'Tap the map to set the venue location'}
+                : 'Tap the map or search to set the venue location'}
         </Typography>
         {pos && (
           <Button
