@@ -27,8 +27,20 @@ export function PageHead({ title, sub, action }: { title: string; sub?: string; 
 }
 
 // Dashboard stat card — same label / value / sub contract as the mobile app.
-// ~55% orange tint background so the cards pop (brand parity with mobile).
-export function StatCard({ label, value, sub, onClick }: { label: string; value: ReactNode; sub?: string; onClick?: () => void }) {
+// Deep, saturated color variants by card position (orange / red / teal / indigo
+// / amber / green) with white text — a sports-brand look with crisp legibility.
+// The palette is exported so the Flutter app renders the identical set.
+export const statVariants = [
+  { bg: '#E8590C', edge: '#F0762E' }, // deep orange
+  { bg: '#C2273B', edge: '#E14A5C' }, // deep red
+  { bg: '#0B7A6B', edge: '#2E9C8D' }, // deep teal
+  { bg: '#4338CA', edge: '#6366F1' }, // deep indigo
+  { bg: '#B45309', edge: '#D97706' }, // deep amber
+  { bg: '#2F6F3E', edge: '#4C8F5C' }, // deep green
+] as const
+
+export function StatCard({ label, value, sub, onClick, variant = 0 }: { label: string; value: ReactNode; sub?: string; onClick?: () => void; variant?: number }) {
+  const v = statVariants[((variant % statVariants.length) + statVariants.length) % statVariants.length]
   return (
     <Paper
       elevation={0}
@@ -38,13 +50,13 @@ export function StatCard({ label, value, sub, onClick }: { label: string; value:
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: '#FFF1E7',
-        border: '1px solid rgba(255,106,19,0.25)',
+        bgcolor: v.bg,
+        border: '1px solid ' + v.edge,
         borderRadius: 3,
         // Clickable cards act as quick links into their module.
         ...(onClick
           ? { cursor: 'pointer', transition: 'transform .12s, box-shadow .12s',
-              '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 22px rgba(255,106,19,0.18)', borderColor: 'rgba(255,106,19,0.5)' } }
+              '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 8px 22px ${v.bg}55`, borderColor: v.edge } }
           : {}),
       }}
     >
@@ -54,7 +66,7 @@ export function StatCard({ label, value, sub, onClick }: { label: string; value:
           fontWeight: 700,
           textTransform: 'uppercase',
           letterSpacing: 1,
-          color: '#B25A1F',
+          color: 'rgba(255,255,255,0.85)',
         }}
       >
         {label}
@@ -65,7 +77,7 @@ export function StatCard({ label, value, sub, onClick }: { label: string; value:
           fontWeight: 700,
           lineHeight: 1.2,
           mt: 0.5,
-          color: '#1A1A1A',
+          color: '#FFFFFF',
           overflowWrap: 'anywhere',
           wordBreak: 'break-word',
         }}
@@ -73,7 +85,7 @@ export function StatCard({ label, value, sub, onClick }: { label: string; value:
         {value}
       </Typography>
       {sub && (
-        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 'auto' }}>
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.72)', mt: 'auto' }}>
           {sub}
         </Typography>
       )}

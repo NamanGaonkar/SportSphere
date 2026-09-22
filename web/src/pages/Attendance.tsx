@@ -150,8 +150,8 @@ export default function Attendance() {
           mb: 2,
         }}
       >
-        <StatCard label="Marked" value={summary.total} sub={`of ${rows.length} athletes`} />
-        <StatCard label="Present + Late" value={summary.present} sub={`${summary.pct}% of ${rows.length} people`} />
+        <StatCard label="Marked" value={summary.total} sub={`of ${rows.length} athletes`} variant={0} />
+        <StatCard label="Present + Late" value={summary.present} sub={`${summary.pct}% of ${rows.length} people`} variant={2} />
       </Box>
 
       <Paper>

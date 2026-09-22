@@ -197,14 +197,15 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
               children: [
                 SizedBox(
                   width: w,
-                  child: StatCard(label: 'MARKED', value: '${s.total}', sub: 'of ${_rows.length} people'),
+                  child: StatCard(label: 'MARKED', value: '${s.total}', sub: 'of ${_rows.length} people', variant: 0),
                 ),
                 SizedBox(
                   width: w,
                   child: StatCard(
                       label: 'PRESENT + LATE',
                       value: '${s.present}',
-                      sub: '${s.pct}% of ${_rows.length} people'),
+                      sub: '${s.pct}% of ${_rows.length} people',
+                      variant: 2),
                 ),
               ],
             );

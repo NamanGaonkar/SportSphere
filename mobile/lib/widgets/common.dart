@@ -176,22 +176,33 @@ class PageHead extends StatelessWidget {
 }
 
 /// Same label / value / sub contract as web StatCard.
+/// Deep, saturated stat-card variants by card position — identical set to
+/// web/src/components/ui.tsx `statVariants` (sports-brand look, white text).
+const statVariants = [
+  Color(0xFFE8590C), // 0 deep orange
+  Color(0xFFC2273B), // 1 deep red
+  Color(0xFF0B7A6B), // 2 deep teal
+  Color(0xFF4338CA), // 3 deep indigo
+  Color(0xFFB45309), // 4 deep amber
+  Color(0xFF2F6F3E), // 5 deep green
+];
+
 class StatCard extends StatelessWidget {
   final String label;
   final String value;
   final String? sub;
-  const StatCard({super.key, required this.label, required this.value, this.sub});
+  final int variant;
+  const StatCard({super.key, required this.label, required this.value, this.sub, this.variant = 0});
 
   @override
   Widget build(BuildContext context) {
-    // 55% orange tint — makes the stat cards pop on both apps (brand pop).
-    const tint = Color(0xFFFFF1E7); // ~55% toward white from Brand.primary
+    final bg = statVariants[variant % statVariants.length];
     return Card(
-      color: tint,
+      color: bg,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Brand.primary.withValues(alpha: 0.25)),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -203,9 +214,9 @@ class StatCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
+              Text(label.toUpperCase(),
+                  style: TextStyle(
+                      fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Colors.white.withValues(alpha: 0.85))),
               const SizedBox(height: 6),
               // FittedText keeps long values inside the card: the font
               // shrinks to fit one line instead of overflowing.
@@ -214,11 +225,11 @@ class StatCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(value,
                     style: const TextStyle(
-                        fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
+                        fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Colors.white)),
               ),
               const Spacer(),
               if (sub != null)
-                Text(sub!, style: const TextStyle(fontSize: 11.5, color: Colors.black45)),
+                Text(sub!, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.72))),
             ],
           ),
         ),

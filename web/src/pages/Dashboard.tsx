@@ -76,8 +76,7 @@ export default function Dashboard() {
         supabase
           .from('matches')
           .select('*, score_display, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
-          .order('scheduled_at', { ascending: false })
-          .limit(6),
+          .order('scheduled_at', { ascending: false }),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
         // Roster = everyone attendance applies to (athletes + coaches + staff roles).
         supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
@@ -155,10 +154,10 @@ export default function Dashboard() {
         }}
       >
         {/* Stat cards double as quick links into their modules. */}
-        <StatCard label="Athletes" value={counts.athletes} sub="Active roster" onClick={() => navigate('/athletes')} />
-        <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" onClick={() => navigate('/coaches')} />
-        <StatCard label="Teams" value={counts.teams} sub="Registered squads" onClick={() => navigate('/teams')} />
-        <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" onClick={() => navigate('/tournaments')} />
+        <StatCard label="Athletes" value={counts.athletes} sub="Active roster" variant={0} onClick={() => navigate('/athletes')} />
+        <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" variant={1} onClick={() => navigate('/coaches')} />
+        <StatCard label="Teams" value={counts.teams} sub="Registered squads" variant={2} onClick={() => navigate('/teams')} />
+        <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" variant={3} onClick={() => navigate('/tournaments')} />
       </Box>
 
       {/* Ops strip: inventory / procurement / medical at a glance */}
@@ -174,10 +173,11 @@ export default function Dashboard() {
           label="Equipment alerts"
           value={lowStockCount}
           sub={lowStockCount > 0 ? 'Items at or below min stock' : 'All stock levels healthy'}
+          variant={4}
           onClick={() => navigate('/inventory')}
         />
-        <StatCard label="POs awaiting delivery" value={pendingPO} sub="Marked Ordered" onClick={() => navigate('/purchases')} />
-        <StatCard label="Athletes not cleared" value={notCleared} sub="From latest medical records" onClick={() => navigate('/medical')} />
+        <StatCard label="POs awaiting delivery" value={pendingPO} sub="Marked Ordered" variant={5} onClick={() => navigate('/purchases')} />
+        <StatCard label="Athletes not cleared" value={notCleared} sub="From latest medical records" variant={1} onClick={() => navigate('/medical')} />
       </Box>
 
       <Box

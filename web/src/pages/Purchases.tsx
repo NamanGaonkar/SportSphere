@@ -205,9 +205,9 @@ export default function Purchases() {
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
-        <StatCard label="Purchase orders" value={pos.length} sub={`${pos.filter((p) => p.status === 'Received').length} received`} />
-        <StatCard label="Pending delivery" value={pos.filter((p) => p.status === 'Ordered').length} sub={`${inr(pendingValue)} on order`} />
-        <StatCard label="Vendors" value={vendors.length} sub="Active supplier directory" />
+        <StatCard label="Purchase orders" value={pos.length} sub={`${pos.filter((p) => p.status === 'Received').length} received`} variant={0} />
+        <StatCard label="Pending delivery" value={pos.filter((p) => p.status === 'Ordered').length} sub={`${inr(pendingValue)} on order`} variant={4} />
+        <StatCard label="Vendors" value={vendors.length} sub="Active supplier directory" variant={2} />
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}

@@ -143,14 +143,118 @@ String scoreDisplayFor(Map m) {
   return formatScore(k, m, scheduled: scheduled);
 }
 
+/// The drawer's scrollable nav list. Rebuilt per drawer-open (keyed by
+/// session) with a fresh controller that jumps straight to the last saved
+/// offset — the scroll position survives open/close cycles.
+class _DrawerNavList extends StatefulWidget {
+  final List<_NavSection> sections;
+  final String current;
+  final void Function(String label) onSelect;
+  final double initialOffset;
+  const _DrawerNavList({
+    super.key,
+    required this.sections,
+    required this.current,
+    required this.onSelect,
+    required this.initialOffset,
+  });
+
+  @override
+  State<_DrawerNavList> createState() => _DrawerNavListState();
+}
+
+class _DrawerNavListState extends State<_DrawerNavList> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients && widget.initialOffset > 0) {
+        _scroll.jumpTo(widget.initialOffset.clamp(0.0, _scroll.position.maxScrollExtent));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: _scroll,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      children: [
+        for (final s in widget.sections) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
+            child: Text(s.section.toUpperCase(),
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: Colors.white.withValues(alpha: 0.42))),
+          ),
+          for (final item in s.items)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => widget.onSelect(item.label),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  margin: const EdgeInsets.symmetric(vertical: 1),
+                  decoration: BoxDecoration(
+                    color: widget.current == item.label ? Brand.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(item.icon,
+                          size: 20,
+                          color: widget.current == item.label ? Colors.white : Colors.white70),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(item.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white
+                                    .withValues(alpha: widget.current == item.label ? 1 : 0.72),
+                                fontWeight: widget.current == item.label
+                                    ? FontWeight.w700
+                                    : FontWeight.w400)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
 class _HomeShellState extends State<HomeShell> {
   String? _role;
   String _current = 'Dashboard';
   List<_NavSection> _sections = const [];
   final Map<String, Widget> _pageCache = {};
-  // Scroll position of the drawer's nav list — kept across drawer
-  // open/close so reopening puts you exactly where you scrolled to.
-  final ScrollController _drawerScroll = ScrollController();
+  // Drawer nav scroll memory: the offset is continuously saved while the
+  // user scrolls, and each drawer open creates a FRESH controller starting
+  // at the saved offset — so closing and reopening the drawer lands exactly
+  // where you left it instead of snapping back to the top.
+  double _drawerOffset = 0.0;
+  int _drawerSession = 0;
+
+  void _openDrawer() {
+    setState(() => _drawerSession++); // fresh controller -> restores offset
+    Scaffold.of(context).openDrawer();
+  }
 
   static const _kPrefKey = 'sportsphere.nav.last';
 
@@ -204,7 +308,6 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
-    _drawerScroll.dispose();
     super.dispose();
   }
 
@@ -286,67 +389,25 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                   const Divider(color: Colors.white12, height: 1),
                   Expanded(
-                    child: ListView(
-                      controller: _drawerScroll,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      children: [
-                        for (final s in _sections) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
-                            child: Text(s.section.toUpperCase(),
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.2,
-                                    color: Colors.white.withValues(alpha: 0.42))),
-                          ),
-                          for (final item in s.items)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(10),
-                                onTap: () {
-                                  setState(() => _current = item.label);
-                                  // Remember the user's choice across sessions.
-                                  _prefs?.setString(_kPrefKey, item.label);
-                                  Navigator.pop(context);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 11),
-                                  margin: const EdgeInsets.symmetric(vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: _current == item.label
-                                        ? Brand.primary
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(item.icon,
-                                          size: 20,
-                                          color: _current == item.label
-                                              ? Colors.white
-                                              : Colors.white70),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Text(item.label,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.white
-                                                    .withValues(alpha: _current == item.label ? 1 : 0.72),
-                                                fontWeight: _current == item.label
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w400)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ],
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (n) {
+                        if (n is ScrollUpdateNotification) {
+                          _drawerOffset = n.metrics.pixels;
+                        }
+                        return false;
+                      },
+                      child: _DrawerNavList(
+                        key: ValueKey(_drawerSession),
+                        initialOffset: _drawerOffset,
+                        sections: _sections,
+                        current: _current,
+                        onSelect: (label) {
+                          setState(() => _current = label);
+                          // Remember the user's choice across sessions.
+                          _prefs?.setString(_kPrefKey, label);
+                          Navigator.pop(context);
+                        },
+                      ),
                     ),
                   ),
                   const Divider(color: Colors.white12, height: 1),
@@ -397,7 +458,7 @@ class _HomeShellState extends State<HomeShell> {
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
+            onPressed: () => _openDrawer(),
           ),
         ),
         actions: [
@@ -509,8 +570,7 @@ class _DashboardHomeState extends State<DashboardHome> {
             .from('matches')
             .select(
                 'id, status, score_a, score_b, score_display, scheduled_at, team_a:teams!matches_team_a_id_fkey(name, sport_id), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
-            .order('scheduled_at', ascending: false)
-            .limit(6),
+            .order('scheduled_at', ascending: false),
         c
             .from('attendance')
             .select('date, status')
@@ -610,10 +670,10 @@ class _DashboardHomeState extends State<DashboardHome> {
             final cols = constraints.maxWidth >= 560 ? 4 : 2;
             final itemWidth = (constraints.maxWidth - gap * (cols - 1)) / cols;
             final values = [
-              ('ATHLETES', '$_athletes', 'Active roster', 'Athletes'),
-              ('COACHES', '$_coaches', 'Across all sports', 'Coaches'),
-              ('TEAMS', '$_teams', 'Registered squads', 'Teams'),
-              ('TOURNAMENTS', '$_tournaments', 'All levels', 'Tournaments'),
+              ('ATHLETES', '$_athletes', 'Active roster', 'Athletes', 0),
+              ('COACHES', '$_coaches', 'Across all sports', 'Coaches', 1),
+              ('TEAMS', '$_teams', 'Registered squads', 'Teams', 2),
+              ('TOURNAMENTS', '$_tournaments', 'All levels', 'Tournaments', 3),
             ];
             return Wrap(
               spacing: gap,
@@ -625,7 +685,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                     child: InkWell(
                       onTap: () => widget.onOpenPage?.call(v.$4),
                       borderRadius: BorderRadius.circular(12),
-                      child: StatCard(label: v.$1, value: v.$2, sub: v.$3),
+                      child: StatCard(label: v.$1, value: v.$2, sub: v.$3, variant: v.$5),
                     ),
                   ),
               ],

@@ -195,9 +195,9 @@ export default function Inventory() {
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
-        <StatCard label="Items" value={rows.length} sub={`${rows.reduce((s, r) => s + (r.quantity ?? 0), 0)} units in stock`} />
-        <StatCard label="Low stock" value={lowStock.length} sub="At or below minimum level" />
-        <StatCard label="Estimated value" value={inrCompact(totalValue)} sub="Quantity x unit cost" />
+        <StatCard label="Items" value={rows.length} sub={`${rows.reduce((s, r) => s + (r.quantity ?? 0), 0)} units in stock`} variant={0} />
+        <StatCard label="Low stock" value={lowStock.length} sub="At or below minimum level" variant={4} />
+        <StatCard label="Estimated value" value={inrCompact(totalValue)} sub="Quantity x unit cost" variant={2} />
       </Box>
 
       {lowStock.length > 0 && tab === 0 && (

@@ -89,9 +89,9 @@ class _PurchasesPageState extends State<PurchasesPage> {
                 spacing: gap,
                 runSpacing: gap,
                 children: [
-                  SizedBox(width: w, child: StatCard(label: 'ORDERS', value: '${_pos.length}', sub: '${_pos.where((p) => p['status'] == 'Received').length} received')),
-                  SizedBox(width: w, child: StatCard(label: 'PENDING', value: '${pending.length}', sub: '${inr(pendingValue)} on order')),
-                  SizedBox(width: w, child: StatCard(label: 'VENDORS', value: '${_vendors.length}', sub: 'Active suppliers')),
+                  SizedBox(width: w, child: StatCard(label: 'ORDERS', value: '${_pos.length}', sub: '${_pos.where((p) => p['status'] == 'Received').length} received', variant: 0)),
+                  SizedBox(width: w, child: StatCard(label: 'PENDING', value: '${pending.length}', sub: '${inr(pendingValue)} on order', variant: 4)),
+                  SizedBox(width: w, child: StatCard(label: 'VENDORS', value: '${_vendors.length}', sub: 'Active suppliers', variant: 2)),
                 ],
               );
             }),

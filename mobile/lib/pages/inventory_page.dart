@@ -87,9 +87,9 @@ class _InventoryPageState extends State<InventoryPage> {
                 spacing: gap,
                 runSpacing: gap,
                 children: [
-                  SizedBox(width: w, child: StatCard(label: 'ITEMS', value: '${_rows.length}', sub: '$units units in stock')),
-                  SizedBox(width: w, child: StatCard(label: 'LOW STOCK', value: '${low.length}', sub: 'At or below minimum')),
-                  SizedBox(width: w, child: StatCard(label: 'VALUE', value: inrCompact(_totalValue), sub: 'Qty x unit cost')),
+                  SizedBox(width: w, child: StatCard(label: 'ITEMS', value: '${_rows.length}', sub: '$units units in stock', variant: 0)),
+                  SizedBox(width: w, child: StatCard(label: 'LOW STOCK', value: '${low.length}', sub: 'At or below minimum', variant: 4)),
+                  SizedBox(width: w, child: StatCard(label: 'VALUE', value: inrCompact(_totalValue), sub: 'Qty x unit cost', variant: 2)),
                 ],
               );
             }),
