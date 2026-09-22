@@ -12,7 +12,11 @@ import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
+import Avatar from '@mui/material/Avatar'
+import Tooltip from '@mui/material/Tooltip'
+import IconButton from '@mui/material/IconButton'
 import SearchIcon from '@mui/icons-material/Search'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import InputAdornment from '@mui/material/InputAdornment'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
@@ -29,10 +33,8 @@ type UserRow = {
   role: string
   contact_info: string | null
   phone: string | null
+  avatar_url: string | null
   created_at: string
-  athletes: { id: string }[] | null
-  coaches: { id: string }[] | null
-  staff: { id: string }[] | null
   email?: string | null
 }
 
@@ -41,11 +43,16 @@ const ROLES = ['Admin', 'Coach', 'Athlete', 'HR', 'Finance', 'VenueManager']
 const roleColor = (r: string) =>
   r === 'Admin' ? 'error' : r === 'Coach' ? 'info' : r === 'HR' ? 'warning' : r === 'Finance' ? 'success' : 'default'
 
-/** Admin-only user management: rename, change role, edit contact, create staff accounts. */
+const initials = (name: string) =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?'
+
+/** Admin-only user management — dense modern table: avatar + identity, role,
+ *  inline-editable phone, joined. No under-full stretched columns. */
 export default function Users() {
   const [rows, setRows] = useState<UserRow[]>([])
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
+  const [okMsg, setOkMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
@@ -54,14 +61,16 @@ export default function Users() {
   const [addForm, setAddForm] = useState({
     email: '', password: '', full_name: '', role: 'HR', department: '', designation: '',
   })
-  const [okMsg, setOkMsg] = useState('')
+  // Inline rename dialog (keeps the table cell clean — name is not a form).
+  const [renaming, setRenaming] = useState<UserRow | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     const [prof, emails] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, full_name, role, contact_info, phone, created_at, athletes(id), coaches(id), staff(id)')
+        .select('id, full_name, role, contact_info, phone, avatar_url, created_at')
         .order('created_at', { ascending: false }),
       // Auth emails live outside profiles; admin-only RPC surfaces them.
       supabase.rpc('admin_list_emails'),
@@ -80,19 +89,13 @@ export default function Users() {
   useRealtimeTable('profiles', load)
 
   const filtered = rows.filter((r) =>
-    !q || [r.full_name, r.role, r.contact_info, r.phone, r.email].some((v) => (v ?? '').toLowerCase().includes(q.toLowerCase())),
+    !q || [r.full_name, r.role, r.phone, r.email].some((v) => (v ?? '').toLowerCase().includes(q.toLowerCase())),
   )
-
-  async function setPhone(r: UserRow, phone: string) {
-    if (phone === (r.phone ?? '')) return
-    const { error } = await supabase.rpc('admin_set_phone', { p_user: r.id, p_phone: phone })
-    if (error) setError(error.message)
-  }
 
   async function setRole(r: UserRow, role: string) {
     setError('')
-    if (r.role === 'Admin' && role !== 'Admin') {
-      setError('Cannot demote the fixed admin account here - promote another admin first by SQL.')
+    if (r.role === 'Admin') {
+      setError('The primary Admin account is protected and cannot be changed.')
       return
     }
     const { error } = await supabase.rpc('admin_set_role', { p_user: r.id, p_role: role })
@@ -106,9 +109,9 @@ export default function Users() {
     if (error) setError(error.message)
   }
 
-  async function setContact(r: UserRow, contact: string) {
-    if (contact === (r.contact_info ?? '')) return
-    const { error } = await supabase.rpc('admin_set_contact', { p_user: r.id, p_contact: contact || null })
+  async function setPhone(r: UserRow, phone: string) {
+    if (phone === (r.phone ?? '')) return
+    const { error } = await supabase.rpc('admin_set_phone', { p_user: r.id, p_phone: phone })
     if (error) setError(error.message)
   }
 
@@ -135,7 +138,7 @@ export default function Users() {
     <Box>
       <PageHead
         title="User Management"
-        sub="Manage every account: names, roles, contacts - and create staff accounts directly."
+        sub="Every account at a glance - role, contact and join date, editable in place."
         action={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAdd(true)}>
             Add staff / user
@@ -148,10 +151,10 @@ export default function Users() {
 
       <TextField
         size="small"
-        placeholder="Search users"
+        placeholder="Search name, role, email or phone"
         value={q}
         onChange={(e) => { setQ(e.target.value); setPage(0) }}
-        sx={{ mb: 2, width: 280 }}
+        sx={{ mb: 2, width: 320 }}
         slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
       />
 
@@ -162,15 +165,14 @@ export default function Users() {
           <EmptyState text="No users found." />
         ) : (
           <>
-            <TableContainer sx={dataTableSx}>
+            <TableContainer sx={{ ...dataTableSx, '& .MuiTableCell-root': { py: 1 } }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Phone</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Joined</TableCell>
+                    <TableCell>Member</TableCell>
+                    <TableCell sx={{ width: 150 }}>Role</TableCell>
+                    <TableCell sx={{ width: 170 }}>Phone</TableCell>
+                    <TableCell sx={{ width: 110 }}>Joined</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -178,47 +180,57 @@ export default function Users() {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((r) => (
                       <TableRow key={r.id} hover>
-                        {/* Compact inline editors: no under-full standard
-                            TextFields stretching into empty space. */}
-                        <TableCell sx={{ width: 220 }}>
-                          <TextField
-                            defaultValue={r.full_name}
-                            onBlur={(e) => rename(r, e.target.value)}
-                            variant="standard"
-                            fullWidth
-                            slotProps={{ input: { disableUnderline: false } }}
-                            sx={{ '& input': { fontWeight: 600, py: 0.5 } }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ color: 'text.secondary' }}>
-                          {r.email ?? <span style={{ opacity: 0.4 }}>-</span>}
-                        </TableCell>
-                        <TableCell sx={{ width: 170 }}>
-                          <TextField
-                            defaultValue={r.phone ?? r.contact_info ?? ''}
-                            onBlur={(e) => setPhone(r, e.target.value)}
-                            variant="standard"
-                            placeholder="-"
-                            fullWidth
-                            sx={{ '& input': { py: 0.5 } }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ width: 210 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75 }}>
-                            <Chip size="small" color={roleColor(r.role) as 'error'} label={r.role} />
-                            <TextField
-                              select
-                              size="small"
-                              value={r.role}
-                              onChange={(e) => setRole(r, e.target.value)}
-                              fullWidth
-                              disabled={r.role === 'Admin'}
+                        <TableCell>
+                          {/* Identity block: avatar + name + email stacked —
+                              dense, no half-empty stretched columns. */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 220 }}>
+                            <Avatar
+                              src={r.avatar_url ?? undefined}
+                              sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'secondary.main' }}
                             >
-                              {ROLES.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}
-                            </TextField>
+                              {initials(r.full_name)}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Box sx={{ fontWeight: 600, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {r.full_name}
+                                </Box>
+                                <Tooltip title="Rename">
+                                  <IconButton
+                                    size="small"
+                                    sx={{ p: 0.25, opacity: 0.45, '&:hover': { opacity: 1 } }}
+                                    onClick={() => { setRenaming(r); setRenameValue(r.full_name) }}
+                                    aria-label="Rename"
+                                  >
+                                    <EditOutlinedIcon sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                              <Box sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {r.email ?? '-'}
+                              </Box>
+                            </Box>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <RoleSelect role={r.role} onChange={(v) => setRole(r, v)} />
+                        </TableCell>
+                        <TableCell>
+                          {/* Editable in place: blur saves via admin RPC.
+                              Blank = never entered (clear on the server). */}
+                          <TextField
+                            defaultValue={r.phone ?? ''}
+                            onBlur={(e) => setPhone(r, e.target.value.trim())}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            variant="standard"
+                            placeholder="Add phone"
+                            size="small"
+                            sx={{ '& input': { py: 0.25, fontSize: 13 } }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap', fontSize: 12.5 }}>
+                          {new Date(r.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' })}
+                        </TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
@@ -237,6 +249,31 @@ export default function Users() {
         )}
       </Paper>
 
+      {/* Rename dialog */}
+      <Dialog open={!!renaming} onClose={() => setRenaming(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Rename user</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus fullWidth margin="dense"
+            label="Full name" value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && renaming) { rename(renaming, renameValue); setRenaming(null) }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setRenaming(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => { if (renaming) { rename(renaming, renameValue); setRenaming(null) } }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create account */}
       <Dialog open={showAdd} onClose={() => setShowAdd(false)} maxWidth="sm" fullWidth>
         <form onSubmit={createAccount}>
           <DialogTitle>Create account</DialogTitle>
@@ -246,7 +283,7 @@ export default function Users() {
               <TextField label="Password (min 6 chars)" type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} required fullWidth slotProps={{ htmlInput: { minLength: 6 } }} />
               <TextField label="Full name" value={addForm.full_name} onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })} required fullWidth />
               <TextField select label="Role" value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })} fullWidth>
-                {['HR', 'Finance', 'VenueManager', 'Coach', 'Athlete', 'Admin'].map((x) => <MUIMenuItem key={x} value={x}>{x}</MUIMenuItem>)}
+                {['HR', 'Finance', 'VenueManager', 'Coach', 'Athlete'].map((x) => <MUIMenuItem key={x} value={x}>{x}</MUIMenuItem>)}
               </TextField>
               {(addForm.role === 'HR' || addForm.role === 'Finance' || addForm.role === 'VenueManager') && (
                 <>
@@ -263,5 +300,21 @@ export default function Users() {
         </form>
       </Dialog>
     </Box>
+  )
+}
+
+/** Compact role selector: chip look + dropdown, fixed 150px — no stretching. */
+function RoleSelect({ role, onChange }: { role: string; onChange: (v: string) => void }) {
+  if (role === 'Admin') return <Chip size="small" color="error" label="Admin" />
+  return (
+    <TextField
+      select
+      size="small"
+      value={role}
+      onChange={(e) => onChange(e.target.value)}
+      sx={{ width: '100%', '& .MuiInputBase-root': { fontSize: 13 } }}
+    >
+      {ROLES.filter((x) => x !== 'Admin').map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}
+    </TextField>
   )
 }
