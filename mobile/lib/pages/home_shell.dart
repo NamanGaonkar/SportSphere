@@ -83,8 +83,12 @@ const _navSections = <_NavSection>[
         roles: ['Admin', 'VenueManager', 'Coach']),
   ]),
   _NavSection('Athlete Care', [
-    _NavItem('Performance', Icons.speed_outlined, _performance, roles: ['Admin', 'Coach']),
-    _NavItem('Medical', Icons.medical_services_outlined, _medical, roles: ['Admin', 'Coach', 'HR']),
+    // Visible to every staff role — mirrors web App.tsx so the section
+    // shows in the sidebar for all of them.
+    _NavItem('Performance', Icons.speed_outlined, _performance,
+        roles: ['Admin', 'Coach', 'HR', 'Finance', 'VenueManager']),
+    _NavItem('Medical', Icons.medical_services_outlined, _medical,
+        roles: ['Admin', 'Coach', 'HR', 'Finance', 'VenueManager']),
   ]),
 ];
 
@@ -138,6 +142,9 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _pageFor(String label) {
     return _pageCache.putIfAbsent(label, () {
+      // The dashboard receives the quick-link callback so its stat cards
+      // can switch pages (same behavior as the web dashboard).
+      if (label == 'Dashboard') return DashboardHome(onOpenPage: openFromDashboard);
       final item = _sections.expand((s) => s.items).where((i) => i.label == label).first;
       return item.page();
     });
@@ -198,6 +205,14 @@ class _HomeShellState extends State<HomeShell> {
     return [for (final l in labels) _pageFor(l)];
   }
 
+  /// Quick-link target used by the dashboard's tappable stat cards.
+  void openFromDashboard(String label) {
+    final exists = _sections.expand((s) => s.items).any((i) => i.label == label);
+    if (!exists) return;
+    setState(() => _current = label);
+    _prefs?.setString(_kPrefKey, label);
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _sections.expand((s) => s.items).toList();
@@ -219,7 +234,7 @@ class _HomeShellState extends State<HomeShell> {
             child: Container(
               decoration: BoxDecoration(
                 color: Brand.black,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 boxShadow: [
                   BoxShadow(
@@ -391,7 +406,10 @@ class _HomeShellState extends State<HomeShell> {
 // and Recent Awards cards (data identical to the web app).
 // ------------------------------------------------------------------
 class DashboardHome extends StatefulWidget {
-  const DashboardHome({super.key});
+  /// Lets the dashboard's stat cards act as quick links into modules
+  /// (parity with the web dashboard's clickable cards).
+  final void Function(String label)? onOpenPage;
+  const DashboardHome({super.key, this.onOpenPage});
 
   @override
   State<DashboardHome> createState() => _DashboardHomeState();
@@ -571,10 +589,10 @@ class _DashboardHomeState extends State<DashboardHome> {
             final cols = constraints.maxWidth >= 560 ? 4 : 2;
             final itemWidth = (constraints.maxWidth - gap * (cols - 1)) / cols;
             final values = [
-              ('ATHLETES', '$_athletes', 'Active roster'),
-              ('COACHES', '$_coaches', 'Across all sports'),
-              ('TEAMS', '$_teams', 'Registered squads'),
-              ('TOURNAMENTS', '$_tournaments', 'All levels'),
+              ('ATHLETES', '$_athletes', 'Active roster', 'Athletes'),
+              ('COACHES', '$_coaches', 'Across all sports', 'Coaches'),
+              ('TEAMS', '$_teams', 'Registered squads', 'Teams'),
+              ('TOURNAMENTS', '$_tournaments', 'All levels', 'Tournaments'),
             ];
             return Wrap(
               spacing: gap,
@@ -583,7 +601,11 @@ class _DashboardHomeState extends State<DashboardHome> {
                 for (final v in values)
                   SizedBox(
                     width: itemWidth,
-                    child: StatCard(label: v.$1, value: v.$2, sub: v.$3),
+                    child: InkWell(
+                      onTap: () => widget.onOpenPage?.call(v.$4),
+                      borderRadius: BorderRadius.circular(12),
+                      child: StatCard(label: v.$1, value: v.$2, sub: v.$3),
+                    ),
                   ),
               ],
             );

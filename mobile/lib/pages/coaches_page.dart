@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -117,7 +120,7 @@ class _CoachesPageState extends State<CoachesPage> {
                                 : '${r['experience_years']} yrs'),
                         MapEntry(
                             'Certification',
-                            r['certification']?.toString().isEmpty ?? true
+                            (r['certification']?.toString().isEmpty ?? true)
                                 ? '-'
                                 : '${r['certification']}'),
                         MapEntry(
@@ -177,8 +180,20 @@ class _CoachesPageState extends State<CoachesPage> {
     final nameCtrl = TextEditingController(text: '${((editing?['profile'] ?? {}) as Map)['full_name'] ?? ''}');
     final specCtrl = TextEditingController(text: '${editing?['specialization'] ?? ''}');
     final certCtrl = TextEditingController(text: '${editing?['certification'] ?? ''}');
+    final trainsCtrl = TextEditingController(text: '${editing?['trains_note'] ?? ''}');
     final expCtrl = TextEditingController(text: '${editing?['experience_years'] ?? ''}');
     String? sportId = editing?['sport_id']?.toString();
+    String? certUrl = editing?['certification_url']?.toString();
+    // Teams assigned to this coach (edit only) — parity with the web dialog.
+    Set<String> selectedTeams = {
+      if (editing != null)
+        for (final t in (editing['teams'] as List?) ?? const []) (t as Map)['id'] as String,
+    };
+    List<DbRow> allTeams = const [];
+    try {
+      allTeams = (await client.from('teams').select('id, name').order('name')).cast<DbRow>();
+    } catch (_) {}
+    if (!mounted) return;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -211,9 +226,47 @@ class _CoachesPageState extends State<CoachesPage> {
                 onChanged: (v) => setModal(() => sportId = v),
               ),
               const SizedBox(height: 14),
-              TextField(controller: certCtrl, decoration: const InputDecoration(labelText: 'Certification')),
+              TextField(controller: certCtrl, decoration: const InputDecoration(labelText: 'Certification (title)')),
+              const SizedBox(height: 10),
+              // Certification as a real PDF upload (documents bucket).
+              OutlinedButton.icon(
+                icon: const Icon(Icons.upload_file, size: 18),
+                label: Text((certUrl?.isEmpty ?? true)
+                    ? 'Upload certification (PDF)'
+                    : 'Certification attached - tap to replace'),
+                onPressed: () async {
+                  final pickerCtx = ctx;
+                  final picked = await _pickPdf();
+                  if (picked == null) return;
+                  if (!pickerCtx.mounted) return;
+                  setModal(() => certUrl = picked);
+                },
+              ),
+              const SizedBox(height: 14),
+              TextField(controller: trainsCtrl, decoration: const InputDecoration(labelText: 'Trains (teams / players note)')),
               const SizedBox(height: 14),
               TextField(controller: expCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Experience (years)')),
+              if (editing != null) ...[
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Teams assigned', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final t in allTeams)
+                      FilterChip(
+                        label: Text('${t['name']}', style: const TextStyle(fontSize: 12)),
+                        selected: selectedTeams.contains('${t['id']}'),
+                        onSelected: (on) => setModal(() =>
+                            on ? selectedTeams.add('${t['id']}') : selectedTeams.remove('${t['id']}')),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 20),
               Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
@@ -238,6 +291,8 @@ class _CoachesPageState extends State<CoachesPage> {
       'specialization': spec.isEmpty ? null : spec,
       'sport_id': (sportId?.isEmpty ?? true) ? null : sportId,
       'certification': certCtrl.text.trim().isEmpty ? null : certCtrl.text.trim(),
+      'certification_url': (certUrl?.isEmpty ?? true) ? null : certUrl,
+      'trains_note': trainsCtrl.text.trim().isEmpty ? null : trainsCtrl.text.trim(),
       'experience_years': expCtrl.text.trim().isEmpty ? null : num.tryParse(expCtrl.text.trim()),
     };
     try {
@@ -247,6 +302,10 @@ class _CoachesPageState extends State<CoachesPage> {
           await client.from('profiles').update({'full_name': name}).eq('id', profileId);
         }
         await client.from('coaches').update(payload).eq('id', editing['id']);
+        await client.rpc('admin_assign_coach_teams', params: {
+          'p_coach': editing['id'],
+          'p_teams': selectedTeams.toList(),
+        });
       } else {
         final profile = await client.from('profiles').insert({'full_name': name, 'role': 'Coach'}).select('id').single();
         await client.from('coaches').insert({'profile_id': profile['id'], ...payload});
@@ -254,6 +313,24 @@ class _CoachesPageState extends State<CoachesPage> {
       _load();
     } catch (e) {
       if (mounted) showSnack(context, 'Save failed: $e', error: true);
+    }
+  }
+
+  /// Upload a certification PDF to the documents bucket; returns the URL.
+  Future<String?> _pickPdf() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      final file = result?.files.single;
+      if (file == null || file.path == null) return null;
+      final path = 'shared/coach_cert_${DateTime.now().millisecondsSinceEpoch}_${file.name.replaceAll(' ', '_')}';
+      await client.storage.from('documents').upload(path, File(file.path!));
+      return client.storage.from('documents').getPublicUrl(path);
+    } catch (_) {
+      if (mounted) showSnack(context, 'Upload failed', error: true);
+      return null;
     }
   }
 

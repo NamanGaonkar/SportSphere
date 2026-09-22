@@ -27,6 +27,8 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
 import { useSportNameMap } from '../components/SportSelect'
+import { useRole } from '../lib/permissions'
+import FileField from '../components/FileField'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
@@ -35,19 +37,27 @@ type Coach = {
   specialization: string | null
   sport_id: string | null
   certification: string | null
+  certification_url: string | null
   experience_years: number | null
+  trains_note: string | null
   profile: { id: string; full_name: string; contact_info: string | null; avatar_url: string | null } | null
   teams: { id: string; name: string }[] | null
 }
 
-const empty = { full_name: '', specialization: '', sport_id: '', certification: '', experience_years: '' }
+const empty = {
+  full_name: '', specialization: '', sport_id: '', certification: '',
+  certification_url: '', experience_years: '', trains_note: '',
+  teams: [] as string[],
+}
 
 function coachPayload(f: typeof empty) {
   return {
     specialization: f.specialization || null,
     sport_id: f.sport_id || null,
     certification: f.certification || null,
+    certification_url: f.certification_url || null,
     experience_years: f.experience_years === '' ? null : Number(f.experience_years),
+    trains_note: f.trains_note || null,
   }
 }
 
@@ -63,6 +73,9 @@ export default function Coaches() {
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [allTeams, setAllTeams] = useState<{ id: string; name: string }[]>([])
+  const role = useRole()
+  const canEdit = role === 'Admin' || role === 'HR'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -75,6 +88,13 @@ export default function Coaches() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Teams list for the assignment multi-select (edit dialog).
+  useEffect(() => {
+    supabase.from('teams').select('id, name').order('name').then(({ data }) => {
+      setAllTeams((data as unknown as { id: string; name: string }[]) ?? [])
+    })
+  }, [])
 
   const filtered = useMemo(
     () => rows.filter((r) => (r.profile?.full_name ?? '').toLowerCase().includes(q.toLowerCase())),
@@ -96,6 +116,12 @@ export default function Coaches() {
         .update(coachPayload(form))
         .eq('id', editing)
       if (error) { setError(error.message); return }
+      // Team assignments: rewrite the coach_id link on every team.
+      const { error: tErr } = await supabase.rpc('admin_assign_coach_teams', {
+        p_coach: editing,
+        p_teams: form.teams,
+      })
+      if (tErr) { setError(tErr.message); return }
     } else {
       const { data: profile, error: pErr } = await supabase
         .from('profiles')
@@ -131,7 +157,10 @@ export default function Coaches() {
       specialization: r.specialization ?? '',
       sport_id: r.sport_id ?? '',
       certification: r.certification ?? '',
+      certification_url: r.certification_url ?? '',
       experience_years: r.experience_years?.toString() ?? '',
+      trains_note: r.trains_note ?? '',
+      teams: (r.teams ?? []).map((t) => t.id),
     })
     setShowForm(true)
   }
@@ -181,7 +210,7 @@ export default function Coaches() {
                     <TableCell>Sport</TableCell>
                     <TableCell>Experience</TableCell>
                     <TableCell>Teams</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    {canEdit && <TableCell align="right" sx={{ width: 96 }}>Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -215,14 +244,16 @@ export default function Coaches() {
                             </Box>
                           )}
                         </TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" color="error" onClick={() => remove(r.id)} aria-label="Delete">
-                            <DeleteOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
+                        {canEdit && (
+                          <TableCell align="right" sx={{ whiteSpace: 'nowrap', width: 96, pr: 2 }}>
+                            <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" color="error" onClick={() => remove(r.id)} aria-label="Delete">
+                              <DeleteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                 </TableBody>
@@ -252,8 +283,39 @@ export default function Coaches() {
                 <MenuItem value="">None</MenuItem>
                 {[...sportName.entries()].map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
               </TextField>
-              <TextField label="Certification" value={form.certification} onChange={(e) => setForm({ ...form, certification: e.target.value })} fullWidth />
+              <TextField label="Certification (title)" value={form.certification} onChange={(e) => setForm({ ...form, certification: e.target.value })} fullWidth />
               <TextField type="number" label="Experience (years)" value={form.experience_years} onChange={(e) => setForm({ ...form, experience_years: e.target.value })} fullWidth />
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                {/* Certification as an actual PDF (tester round 2 #11). */}
+                <FileField
+                  label="Upload certification (PDF)"
+                  value={String(form.certification_url ?? '')}
+                  onChange={(url) => setForm({ ...form, certification_url: url })}
+                />
+              </Box>
+              <TextField
+                label="Trains (teams / players note)"
+                value={form.trains_note}
+                onChange={(e) => setForm({ ...form, trains_note: e.target.value })}
+                fullWidth
+                sx={{ gridColumn: '1 / -1' }}
+              />
+              {editing && (
+                <TextField
+                  select
+                  label="Teams assigned"
+                  value={form.teams}
+                  onChange={(e) => setForm({ ...form, teams: typeof e.target.value === 'string' ? [e.target.value] : e.target.value })}
+                  slotProps={{
+                    select: { multiple: true },
+                    inputLabel: { shrink: true },
+                  }}
+                  fullWidth
+                  sx={{ gridColumn: '1 / -1' }}
+                >
+                  {allTeams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                </TextField>
+              )}
             </Box>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>

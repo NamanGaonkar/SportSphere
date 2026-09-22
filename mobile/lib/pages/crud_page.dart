@@ -10,7 +10,7 @@ import '../widgets/common.dart';
 
 typedef DbRow = Map<String, dynamic>;
 
-enum FType { text, number, date, datetime, textarea, select, checkbox }
+enum FType { text, number, date, datetime, time, textarea, select, checkbox }
 
 class SourceDef {
   final String table;
@@ -87,8 +87,10 @@ List<Widget Function()> modulePages() {
           FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource),
           FieldDef('assigned_to', 'Assigned to'),
           FieldDef('scheduled_date', 'Scheduled date', type: FType.date),
-          FieldDef('start_time', 'Start time', type: FType.datetime),
-          FieldDef('end_time', 'End time', type: FType.datetime),
+          // Time-only inputs: the scheduled date already carries the day
+          // (tester round 2 #16 — no second date picker inside the times).
+          FieldDef('start_time', 'Start time', type: FType.time),
+          FieldDef('end_time', 'End time', type: FType.time),
           FieldDef('status', 'Status', type: FType.select, options: ['Pending', 'In Progress', 'Done']),
           FieldDef('notes', 'Notes', type: FType.textarea, fullWidth: true),
         ],
@@ -204,7 +206,10 @@ List<Widget Function()> modulePages() {
           FieldDef('sport_id', 'Sport', type: FType.select, source: sportSource),
           FieldDef('coach_id', 'Coach', type: FType.select, source: coachSource),
           FieldDef('team_id', 'Team', type: FType.select, source: teamSource),
-          FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource),
+          FieldDef('venue_id', 'Venue / destination', type: FType.select, source: venueSource),
+          FieldDef('frequency', 'Frequency', type: FType.select, options: ['Daily', 'Weekly', 'Monthly', 'One-off']),
+          FieldDef('start_date', 'Camp start', type: FType.date),
+          FieldDef('end_date', 'Camp end', type: FType.date),
           FieldDef('start_time', 'Starts', type: FType.datetime),
           FieldDef('end_time', 'Ends', type: FType.datetime),
           FieldDef('notes', 'Notes', type: FType.textarea, fullWidth: true),
@@ -294,11 +299,12 @@ List<Widget Function()> modulePages() {
 
   Widget transport() => CrudList(
         title: 'Transport',
-        sub: 'Team travel - buses, vehicles, drivers.',
+        sub: 'Team travel - buses, vehicles, drivers and destinations.',
         table: 'transport',
-        searchKeys: const ['purpose', 'vehicle', 'driver'],
+        searchKeys: const ['purpose', 'destination', 'vehicle', 'driver'],
         columns: [
           ColumnDef('purpose', 'Purpose'),
+          ColumnDef('destination', 'Destination'),
           ColumnDef('vehicle', 'Vehicle'),
           ColumnDef('driver', 'Driver'),
           ColumnDef('depart_at', 'Departure', render: (r) => Text(fmtDateTime(r['depart_at']?.toString()))),
@@ -307,6 +313,7 @@ List<Widget Function()> modulePages() {
         ],
         fields: const [
           FieldDef('purpose', 'Purpose', required: true),
+          FieldDef('destination', 'Destination', required: true),
           FieldDef('vehicle', 'Vehicle'),
           FieldDef('driver', 'Driver'),
           FieldDef('team_id', 'Team', type: FType.select, source: teamSource),
@@ -318,12 +325,14 @@ List<Widget Function()> modulePages() {
 
   Widget accommodation() => CrudList(
         title: 'Accommodation',
-        sub: 'Hotel stays for teams during travel.',
+        sub: 'Hotel stays for teams, linked to the tournament or match they attend.',
         table: 'accommodation',
-        searchKeys: const ['hotel', 'location'],
+        searchKeys: const ['hotel', 'location', 'event_note'],
         columns: [
           ColumnDef('hotel', 'Hotel'),
           ColumnDef('location', 'Location'),
+          ColumnDef('team_id', 'Team', render: (r) => _srcText('teams', r['team_id'])),
+          ColumnDef('event_note', 'Staying for'),
           ColumnDef('check_in', 'Check-in', render: (r) => Text(fmtDate(r['check_in']?.toString()))),
           ColumnDef('check_out', 'Check-out', render: (r) => Text(fmtDate(r['check_out']?.toString()))),
           ColumnDef('rooms', 'Rooms'),
@@ -334,6 +343,7 @@ List<Widget Function()> modulePages() {
           FieldDef('hotel', 'Hotel', required: true),
           FieldDef('location', 'Location'),
           FieldDef('team_id', 'Team', type: FType.select, source: teamSource),
+          FieldDef('event_note', 'Staying for (tournament / match)', fullWidth: true),
           FieldDef('check_in', 'Check-in', type: FType.date),
           FieldDef('check_out', 'Check-out', type: FType.date),
           FieldDef('rooms', 'Rooms', type: FType.number),
@@ -343,21 +353,29 @@ List<Widget Function()> modulePages() {
 
   Widget expenses() => CrudList(
         title: 'Finance & Expenses',
-        sub: 'Organization spending by category.',
+        sub: 'Spending across every module, including vendor purchases and accommodation costs.',
         table: 'expenses',
-        searchKeys: const ['category', 'description'],
+        searchKeys: const ['category', 'description', 'items_note'],
         columns: [
           ColumnDef('category', 'Category'),
+          ColumnDef('vendor_id', 'Vendor', render: (r) => _srcText('vendors', r['vendor_id'])),
+          ColumnDef('items_note', 'Items / services'),
           ColumnDef('amount', 'Amount', render: (r) => Text(inr(_num(r['amount'])))),
           ColumnDef('date', 'Date', render: (r) => Text(fmtDate(r['date']?.toString()))),
-          ColumnDef('description', 'Description'),
+          ColumnDef('status', 'Status', render: (r) {
+            final s = '${r['status'] ?? 'Approved'}';
+            return BadgeChip(s, color: s == 'Approved' ? const Color(0xFF2E7D32) : s == 'Rejected' ? const Color(0xFFC62828) : const Color(0xFFB26A00));
+          }),
           ColumnDef('approved_by', 'Approved by'),
         ],
         fields: const [
           FieldDef('category', 'Category', type: FType.select,
-              options: ['Equipment', 'Travel', 'Salaries', 'Venue', 'Other'], required: true),
+              options: ['Equipment', 'Travel', 'Salaries', 'Venue', 'Accommodation', 'Awards & Prizes', 'Other'], required: true),
+          FieldDef('vendor_id', 'Vendor (if purchased)', type: FType.select, source: SourceDef('vendors', 'id, name', 'name')),
+          FieldDef('items_note', 'Items / services', fullWidth: true),
           FieldDef('amount', 'Amount (INR)', type: FType.number, required: true),
           FieldDef('date', 'Date', type: FType.date),
+          FieldDef('status', 'Status', type: FType.select, options: ['Pending', 'Approved', 'Rejected']),
           FieldDef('description', 'Description', type: FType.textarea, fullWidth: true),
           FieldDef('approved_by', 'Approved by'),
         ],
@@ -371,12 +389,16 @@ List<Widget Function()> modulePages() {
         columns: [
           ColumnDef('title', 'Title'),
           ColumnDef('school', 'School'),
+          ColumnDef('coordinator', 'Coordinator'),
+          ColumnDef('venue_id', 'Venue', render: (r) => _srcText('venues', r['venue_id'])),
           ColumnDef('date', 'Date', render: (r) => Text(fmtDate(r['date']?.toString()))),
           ColumnDef('participants', 'Participants'),
         ],
         fields: const [
           FieldDef('title', 'Title', required: true),
           FieldDef('school', 'School'),
+          FieldDef('coordinator', 'Coordinator (staff member)'),
+          FieldDef('venue_id', 'Venue', type: FType.select, source: venueSource),
           FieldDef('date', 'Date', type: FType.date),
           FieldDef('participants', 'Participants', type: FType.number),
           FieldDef('description', 'Description', type: FType.textarea, fullWidth: true),
@@ -400,6 +422,16 @@ List<Widget Function()> modulePages() {
 }
 
 num? _num(dynamic v) => v is num ? v : num.tryParse('${v ?? ''}');
+
+/// Extract HH:MM from a stored timestamp (or raw time string) so the
+/// time-only edit fields show the clock value, not a full date.
+String _timeOnly(String v) {
+  if (v.isEmpty) return '';
+  final ts = DateTime.tryParse(v);
+  if (ts != null) return '${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}';
+  final m = RegExp(r'(\d{1,2}:\d{2})').firstMatch(v);
+  return m?.group(1) ?? '';
+}
 
 Widget _srcText(String table, dynamic id) {
   return FutureBuilder<String>(
@@ -551,6 +583,10 @@ class _CrudListState extends State<CrudList> {
         return v?.toString() ?? '-';
       case FType.datetime:
         return fmtDateTime(v?.toString());
+      case FType.time:
+        // Stored as a timestamp; display just the clock time.
+        final ts = DateTime.tryParse(v?.toString() ?? '');
+        return ts == null ? '-' : '${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}';
       case FType.date:
         return fmtDate(v?.toString());
       default:
@@ -720,6 +756,16 @@ class _CrudFormState extends State<_CrudForm> {
       if (f.type == FType.datetime && v != null && v != '') {
         v = DateTime.tryParse(v.toString())?.toUtc().toIso8601String();
       }
+      if (f.type == FType.time && v != null && v != '') {
+        // Time-only fields combine with the row's scheduled date (the DB
+        // column is a timestamp) — same behavior as the web app.
+        final dayRaw = '${_form['scheduled_date'] ?? ''}'.split('T').first;
+        final day = dayRaw.isNotEmpty
+            ? dayRaw
+            : DateTime.now().toIso8601String().split('T').first;
+        final parsed = DateTime.tryParse('$day ${v.toString()}:00');
+        v = parsed?.toUtc().toIso8601String();
+      }
       if (f.type == FType.checkbox) v = v == true;
       if (f.type == FType.select && v == '') v = null;
       if (v == '') v = null;
@@ -842,6 +888,13 @@ class _CrudFormState extends State<_CrudForm> {
           label: f.label,
           value: '${_form[f.key] ?? ''}',
           onChanged: (v) => setState(() => _form[f.key] = v ?? ''),
+        );
+      case FType.time:
+        return TextFormField(
+          initialValue: _timeOnly('${_form[f.key] ?? ''}'),
+          decoration: InputDecoration(labelText: '${f.label} (HH:MM)', hintText: '18:30'),
+          keyboardType: TextInputType.datetime,
+          onChanged: (v) => _form[f.key] = v,
         );
       case FType.number:
         return TextFormField(

@@ -39,11 +39,27 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
   Future<void> _load() async {
     try {
-      final data = await client
-          .from('profiles')
-          .select('id, full_name, role, attendance(id, date, status, leave_reason)')
-          .inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'])
-          .order('full_name');
+      // RBAC parity with web: venue managers and athletes only see their
+      // own attendance record, not everyone's.
+      final uid = client.auth.currentUser?.id;
+      final me = uid == null
+          ? null
+          : await client.from('profiles').select('role').eq('id', uid).maybeSingle();
+      final myRole = '${me?['role'] ?? 'Athlete'}';
+      final ownOnly = myRole == 'VenueManager' || myRole == 'Athlete';
+
+      final data = ownOnly && uid != null
+          ? await client
+              .from('profiles')
+              .select('id, full_name, role, attendance(id, date, status, leave_reason)')
+              .inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'])
+              .eq('id', uid)
+              .order('full_name')
+          : await client
+              .from('profiles')
+              .select('id, full_name, role, attendance(id, date, status, leave_reason)')
+              .inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'])
+              .order('full_name');
       if (!mounted) return;
       setState(() {
         _rows = (data as List).cast<DbRow>();

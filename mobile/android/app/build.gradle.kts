@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.sportsphere.sportsphere"
-    compileSdk = flutter.compileSdkVersion
+    // file_picker 10 requires compileSdk 36; the Flutter default is 35 on
+    // this SDK install, so pin it explicitly.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -31,6 +31,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   late final TextEditingController _nameCtrl = TextEditingController();
   late final TextEditingController _contactCtrl = TextEditingController();
+  late final TextEditingController _phoneCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void dispose() {
     _nameCtrl.dispose();
     _contactCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -60,6 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final role = '${profile?['role'] ?? ''}';
       _nameCtrl.text = '${profile?['full_name'] ?? ''}';
       _contactCtrl.text = '${profile?['contact_info'] ?? ''}';
+      _phoneCtrl.text = '${profile?['phone'] ?? ''}';
 
       final futures = <Future<dynamic>>[
         if (role == 'Athlete')
@@ -169,6 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
       await client.from('profiles').update({
         'full_name': _nameCtrl.text.trim(),
         'contact_info': _contactCtrl.text.trim().isEmpty ? null : _contactCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       }).eq('id', uid);
       if (!mounted) return;
       setState(() {
@@ -267,7 +271,16 @@ class _ProfilePageState extends State<ProfilePage> {
                 TextField(
                   controller: _contactCtrl,
                   decoration: const InputDecoration(
-                      labelText: 'Contact (phone / email)', prefixIcon: Icon(Icons.call_outlined, size: 20)),
+                      labelText: 'Email', prefixIcon: Icon(Icons.mail_outline, size: 20)),
+                ),
+                const SizedBox(height: 12),
+                // Separate phone field — signup only asks for email, so the
+                // phone number is captured here (tester round 1 #2).
+                TextField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                      labelText: 'Phone', prefixIcon: Icon(Icons.call_outlined, size: 20)),
                 ),
                 const SizedBox(height: 14),
                 SizedBox(

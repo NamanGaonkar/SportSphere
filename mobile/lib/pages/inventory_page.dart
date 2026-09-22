@@ -191,21 +191,31 @@ class _InventoryPageState extends State<InventoryPage> {
             DataCell(Text('${r['location'] ?? '-'}', overflow: TextOverflow.ellipsis)),
             DataCell(Text('${((r['teams'] ?? {}) as Map)['name'] ?? '-'}', overflow: TextOverflow.ellipsis)),
             DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+              // Compact action buttons with zero inner padding so three of
+              // them fit one row without cramping (tester: less spacing).
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.swap_vert, size: 19),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: const Icon(Icons.swap_vert, size: 18),
                 color: Brand.primary,
                 onPressed: () => _move(r),
                 tooltip: 'Stock movement',
               ),
+              const SizedBox(width: 2),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: const Icon(Icons.edit_outlined, size: 17),
                 onPressed: () => _edit(r),
               ),
+              const SizedBox(width: 2),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.delete_outline, size: 19, color: Color(0xFFC62828)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFC62828)),
                 onPressed: () => _remove(r),
               ),
             ])),

@@ -17,6 +17,7 @@ import TableRow from '@mui/material/TableRow'
 import TablePagination from '@mui/material/TablePagination'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
+import { useSession } from '../App'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState, StatCard } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
@@ -29,20 +30,27 @@ type AthleteRow = {
   } | null
 }
 
-/** All people with attendance (athletes + coaches + staff via profiles). */
-async function loadAttendanceRows() {
-  const { data } = await supabase
+/**
+ * People with attendance (athletes + coaches + staff via profiles).
+ * Venue managers and athletes only ever see their OWN record (tester:
+ * "As venue manager I should not be able to view attendance of everyone").
+ */
+async function loadAttendanceRows(viewerId: string, viewerRole: string) {
+  const ownOnly = viewerRole === 'VenueManager' || viewerRole === 'Athlete'
+  let query = supabase
     .from('profiles')
     .select('id, full_name, role, attendance(id, date, status, leave_reason)')
     .in('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'])
     .order('full_name')
+  if (ownOnly) query = query.eq('id', viewerId)
+  const { data } = await query
   return ((data ?? []) as unknown as {
     id: string
     full_name: string
     role: string
     attendance: { id: string; date: string; status: string; leave_reason: string | null }[]
   }[])
-    .filter((p) => p.role === 'Athlete' || p.attendance.length > 0)
+    .filter((p) => ownOnly || p.role === 'Athlete' || p.attendance.length > 0)
     .map((p) => ({
       id: p.id,
       profile_id: p.id,
@@ -61,12 +69,16 @@ export default function Attendance() {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [loading, setLoading] = useState(true)
   const [leaveFor, setLeaveFor] = useState<{ row: AthleteRow; reason: string } | null>(null)
+  const session = useSession()
+  const viewerId = session?.user.id ?? ''
+  const viewerRole = session?.profile?.role ?? ''
 
   const load = useCallback(async () => {
+    if (!viewerId) return
     setLoading(true)
-    setRows((await loadAttendanceRows()) as unknown as AthleteRow[])
+    setRows((await loadAttendanceRows(viewerId, viewerRole)) as unknown as AthleteRow[])
     setLoading(false)
-  }, [])
+  }, [viewerId, viewerRole])
 
   useEffect(() => { load() }, [load])
   useRealtimeTable('attendance', load)
@@ -113,7 +125,7 @@ export default function Attendance() {
     <Box>
       <PageHead
         title="Attendance & Leave"
-        sub="Mark daily attendance for athletes."
+        sub={viewerRole === 'VenueManager' || viewerRole === 'Athlete' ? 'Your own attendance record.' : 'Mark daily attendance for athletes.'}
         action={
           <TextField
             type="date"

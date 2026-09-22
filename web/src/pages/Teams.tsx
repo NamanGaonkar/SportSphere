@@ -4,6 +4,8 @@ import Paper from '@mui/material/Paper'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
+import Chip from '@mui/material/Chip'
+import Typography from '@mui/material/Typography'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -24,6 +26,7 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
+import { useRole } from '../lib/permissions'
 import { SportSelect, SportFilter } from '../components/SportSelect'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
@@ -36,9 +39,11 @@ type Team = {
   sports: { name: string } | null
   coaches: { profile: { full_name: string } | null } | null
   athletes: { count: number }[] | null
+  athlete_profiles?: { profile: { full_name: string } | null }[] | null
 }
 
-const empty = { name: '', sport_id: '', coach_id: '' }
+type TeamForm = { name: string; sport_id: string; coach_id: string; athleteList?: { id: string; name: string }[] }
+const empty: TeamForm = { name: '', sport_id: '', coach_id: '' }
 
 export default function Teams() {
   const [rows, setRows] = useState<Team[]>([])
@@ -48,14 +53,17 @@ export default function Teams() {
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
-  const [form, setForm] = useState({ ...empty })
+  const [form, setForm] = useState<TeamForm>({ ...empty })
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  // Venue managers are read-only on teams (tester round 2: no edit/delete).
+  const role = useRole()
+  const canEdit = role !== 'VenueManager' && role !== 'Athlete'
 
   const load = useCallback(async () => {
     const [tm, co] = await Promise.all([
-      supabase.from('teams').select('*, sports(name), coaches(*, profile:profiles(full_name)), athletes(count)').order('name'),
+      supabase.from('teams').select('*, sports(name), coaches(*, profile:profiles(full_name)), athletes(count), athlete_profiles:athletes(profile:profiles(full_name))').order('name'),
       supabase.from('coaches').select('id, profile:profiles(full_name)').order('id'),
     ])
     setRows((tm.data as unknown as Team[]) ?? [])
@@ -102,7 +110,16 @@ export default function Teams() {
 
   function openEdit(t: Team) {
     setEditing(t.id)
-    setForm({ name: t.name, sport_id: t.sport_id ?? '', coach_id: t.coach_id ?? '' })
+    setForm({
+      name: t.name,
+      sport_id: t.sport_id ?? '',
+      coach_id: t.coach_id ?? '',
+      // Roster read-only inside the edit dialog (tester: see who is in the team).
+      athleteList: (t.athlete_profiles ?? []).map((p) => ({
+        id: p.profile?.full_name ?? '?',
+        name: p.profile?.full_name ?? '-',
+      })),
+    })
     setShowForm(true)
   }
 
@@ -153,7 +170,7 @@ export default function Teams() {
                     <TableCell>Sport</TableCell>
                     <TableCell>Coach</TableCell>
                     <TableCell>Roster</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    {canEdit && <TableCell align="right" sx={{ width: 96 }}>Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -164,15 +181,21 @@ export default function Teams() {
                         <TableCell>{t.name}</TableCell>
                         <TableCell>{t.sports?.name ?? '-'}</TableCell>
                         <TableCell>{t.coaches?.profile?.full_name ?? '-'}</TableCell>
-                        <TableCell>{t.athletes?.[0]?.count ?? 0} athletes</TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <IconButton size="small" onClick={() => openEdit(t)} aria-label="Edit">
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" color="error" onClick={() => remove(t.id)} aria-label="Delete">
-                            <DeleteOutlinedIcon fontSize="small" />
-                          </IconButton>
+                        <TableCell>
+                          {t.athletes?.[0]?.count
+                            ? `${t.athletes[0].count} athletes`
+                            : 'No athletes'}
                         </TableCell>
+                        {canEdit && (
+                          <TableCell align="right" sx={{ whiteSpace: 'nowrap', width: 96, pr: 2 }}>
+                            <IconButton size="small" onClick={() => openEdit(t)} aria-label="Edit">
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" color="error" onClick={() => remove(t.id)} aria-label="Delete">
+                              <DeleteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                 </TableBody>
@@ -209,6 +232,17 @@ export default function Teams() {
                 ))}
               </TextField>
             </Box>
+            {editing && (form.athleteList?.length ?? 0) > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Squad</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {(form.athleteList as { id: string; name: string }[]).map((a) => (
+                    <Chip key={a.id} size="small" label={a.name} />
+                  ))
+                  }
+                </Box>
+              </Box>
+            )}
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>
           <DialogActions>

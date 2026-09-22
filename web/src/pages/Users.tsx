@@ -16,6 +16,10 @@ import SearchIcon from '@mui/icons-material/Search'
 import InputAdornment from '@mui/material/InputAdornment'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
+import {
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem as MUIMenuItem,
+} from '@mui/material'
+import AddIcon from '@mui/icons-material/Add'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
@@ -35,7 +39,7 @@ const ROLES = ['Admin', 'Coach', 'Athlete', 'HR', 'Finance', 'VenueManager']
 const roleColor = (r: string) =>
   r === 'Admin' ? 'error' : r === 'Coach' ? 'info' : r === 'HR' ? 'warning' : r === 'Finance' ? 'success' : 'default'
 
-/** Admin-only user management: rename, change role, edit contact for everyone. */
+/** Admin-only user management: rename, change role, edit contact, create staff accounts. */
 export default function Users() {
   const [rows, setRows] = useState<UserRow[]>([])
   const [q, setQ] = useState('')
@@ -43,6 +47,12 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
+  // New-account dialog (tester round 2 #7: admin could not add staff/HR).
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState({
+    email: '', password: '', full_name: '', role: 'HR', department: '', designation: '',
+  })
+  const [okMsg, setOkMsg] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,11 +95,39 @@ export default function Users() {
     if (error) setError(error.message)
   }
 
+  async function createAccount(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setOkMsg('')
+    const { data, error } = await supabase.rpc('admin_create_user', {
+      p_email: addForm.email.trim(),
+      p_password: addForm.password,
+      p_name: addForm.full_name.trim(),
+      p_role: addForm.role,
+      p_department: addForm.department || null,
+      p_designation: addForm.designation || null,
+    })
+    if (error) { setError(error.message); return }
+    setOkMsg(`Account created for ${addForm.email} - they can sign in immediately.`)
+    setShowAdd(false)
+    setAddForm({ email: '', password: '', full_name: '', role: 'HR', department: '', designation: '' })
+    load()
+  }
+
   return (
     <Box>
-      <PageHead title="User Management" sub="Manage every account: names, roles and contacts. Changes apply on web and mobile instantly." />
+      <PageHead
+        title="User Management"
+        sub="Manage every account: names, roles, contacts - and create staff accounts directly."
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAdd(true)}>
+            Add staff / user
+          </Button>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {okMsg && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setOkMsg('')}>{okMsg}</Alert>}
 
       <TextField
         size="small"
@@ -181,6 +219,32 @@ export default function Users() {
           </>
         )}
       </Paper>
+
+      <Dialog open={showAdd} onClose={() => setShowAdd(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={createAccount}>
+          <DialogTitle>Create account</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              <TextField label="Email" type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} required fullWidth />
+              <TextField label="Password (min 6 chars)" type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} required fullWidth slotProps={{ htmlInput: { minLength: 6 } }} />
+              <TextField label="Full name" value={addForm.full_name} onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })} required fullWidth />
+              <TextField select label="Role" value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })} fullWidth>
+                {['HR', 'Finance', 'VenueManager', 'Coach', 'Athlete', 'Admin'].map((x) => <MUIMenuItem key={x} value={x}>{x}</MUIMenuItem>)}
+              </TextField>
+              {(addForm.role === 'HR' || addForm.role === 'Finance' || addForm.role === 'VenueManager') && (
+                <>
+                  <TextField label="Department" value={addForm.department} onChange={(e) => setAddForm({ ...addForm, department: e.target.value })} fullWidth />
+                  <TextField label="Designation" value={addForm.designation} onChange={(e) => setAddForm({ ...addForm, designation: e.target.value })} fullWidth />
+                </>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowAdd(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">Create</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Box>
   )
 }

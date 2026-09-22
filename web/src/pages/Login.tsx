@@ -31,10 +31,30 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
 
+  // Simple per-email attempt limiter (tester: limit login attempts/day).
+  // Tracks failed password sign-ins in localStorage; 5 failures lock that
+  // email until the next calendar day (client-side guard; the real wall is
+  // Supabase's own rate limits).
+  const attemptKey = (em: string) => `sportsphere.att.${em.toLowerCase()}.${new Date().toISOString().slice(0, 10)}`
+  const attemptsToday = (em: string) => {
+    try { return Number(localStorage.getItem(attemptKey(em)) ?? '0') } catch { return 0 }
+  }
+  const registerFailure = (em: string) => {
+    try { localStorage.setItem(attemptKey(em), String(attemptsToday(em) + 1)) } catch { /* ignore */ }
+  }
+  const clearAttempts = (em: string) => {
+    try { localStorage.removeItem(attemptKey(em)) } catch { /* ignore */ }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setNotice('')
+
+    if (mode === 0 && attemptsToday(email) >= 5) {
+      setError('Too many sign-in attempts today. Try again tomorrow or reset your password.')
+      return
+    }
     setBusy(true)
 
     if (mode === 1) {
@@ -56,9 +76,12 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
     if (error) {
-      setError(error.message)
+      registerFailure(email)
+      const left = 5 - attemptsToday(email)
+      setError(left > 0 ? `${error.message} (${left} attempt${left === 1 ? '' : 's'} left today)` : 'Too many sign-in attempts today. Try again tomorrow.')
       return
     }
+    clearAttempts(email)
     navigate('/')
   }
 

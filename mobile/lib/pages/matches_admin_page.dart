@@ -19,6 +19,7 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
   List<DbRow> _rows = [];
   List<DbRow> _teams = [];
   List<DbRow> _tournaments = [];
+  List<DbRow> _venues = [];
   bool _loading = true;
   String _tournamentFilter = '';
   String? _sportFilter;
@@ -45,16 +46,18 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
         client
             .from('matches')
             .select(
-                '*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name)')
+                '*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name), venues(name)')
             .order('scheduled_at', ascending: false),
-        client.from('teams').select('id, name').order('name'),
-        client.from('tournaments').select('id, name').order('name'),
+        client.from('teams').select('id, name, sport_id').order('name'),
+        client.from('tournaments').select('id, name, sport_id').order('name'),
+        client.from('venues').select('id, name').order('name'),
       ]);
       if (!mounted) return;
       setState(() {
         _rows = (results[0] as List).cast<DbRow>();
         _teams = (results[1] as List).cast<DbRow>();
         _tournaments = (results[2] as List).cast<DbRow>();
+        _venues = (results[3] as List).cast<DbRow>();
         _loading = false;
       });
     } catch (e) {
@@ -190,8 +193,10 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
           ),
           const SizedBox(height: 2),
           Text(
+            '${m['match_type'] ?? 'League Match'} - '
             '${sports.name(((m['team_a'] ?? {}) as Map)['sport_id']?.toString())} - '
             '${((m['tournaments'] ?? {}) as Map)['name'] ?? '-'} - '
+            '${((m['venues'] ?? {}) as Map)['name'] ?? '-'} - '
             '${when == null ? '-' : fmtDateTime(when.toIso8601String())}',
             style: const TextStyle(fontSize: 11.5, color: Colors.black54),
           ),
@@ -212,7 +217,8 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
                   isDense: true,
                   decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   items: [
-                    for (final s in ['Scheduled', 'Live', 'Completed', 'Cancelled'])
+                    // No Live option — scores are final results (web parity).
+                    for (final s in ['Scheduled', 'Completed', 'Cancelled'])
                       DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 13))),
                   ],
                   onChanged: (v) => v != null && v != status ? _setStatus(m, v) : null,
@@ -253,7 +259,10 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
     String tournamentId = '${editing?['tournament_id'] ?? ''}';
     String teamAId = '${((editing?['team_a'] ?? {}) as Map)['id'] ?? ''}';
     String teamBId = '${((editing?['team_b'] ?? {}) as Map)['id'] ?? ''}';
-    String status = editing != null ? '${editing['status']}' : 'Scheduled';
+    String venueId = '${editing?['venue_id'] ?? ''}';
+    String matchType = editing?['match_type']?.toString() ?? 'League Match';
+    final roundCtrl = TextEditingController(text: '${editing?['round_note'] ?? ''}');
+    String status = editing != null && '${editing['status']}' == 'Live' ? 'Scheduled' : (editing != null ? '${editing['status']}' : 'Scheduled');
     String? scheduledAt = editing?['scheduled_at']?.toString();
 
     final ok = await showModalBottomSheet<bool>(
@@ -288,11 +297,32 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Tournament'),
                         items: [
-                          const DropdownMenuItem(value: '', child: Text('None')),
+                          const DropdownMenuItem(value: '', child: Text('None (friendly / practice)')),
                           for (final t in _tournaments)
                             DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
                         ],
-                        onChanged: (v) => setM(() => tournamentId = v ?? ''),
+                        onChanged: (v) => setM(() {
+                          tournamentId = v ?? '';
+                          // Sport-scoped teams: re-pick when the tournament changes.
+                          teamAId = '';
+                          teamBId = '';
+                        }),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: matchType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Match type'),
+                        items: [
+                          for (final s in ['League Match', 'Tournament Match', 'Quarter Final', 'Semi Final', 'Final', 'Friendly', 'Practice Match'])
+                            DropdownMenuItem(value: s, child: Text(s)),
+                        ],
+                        onChanged: (v) => setM(() => matchType = v ?? 'League Match'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: roundCtrl,
+                        decoration: const InputDecoration(labelText: 'Round note (e.g. Leg 2)'),
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
@@ -300,34 +330,61 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Status'),
                         items: [
-                          for (final s in ['Scheduled', 'Live', 'Completed', 'Cancelled'])
+                          // No Live option — scores are final results (web parity).
+                          for (final s in ['Scheduled', 'Completed', 'Cancelled'])
                             DropdownMenuItem(value: s, child: Text(s)),
                         ],
                         onChanged: (v) => setM(() => status = v ?? 'Scheduled'),
                       ),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        initialValue: teamAId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Team A'),
-                        items: [
-                          const DropdownMenuItem(value: '', child: Text('None')),
-                          for (final t in _teams)
-                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
-                        ],
-                        onChanged: (v) => setM(() => teamAId = v ?? ''),
-                      ),
+                      Builder(builder: (ctx) {
+                        // Only teams eligible for the tournament's sport.
+                        final tSport = _tournaments
+                            .where((t) => '${t['id']}' == tournamentId)
+                            .map((t) => '${t['sport_id'] ?? ''}')
+                            .firstOrNull ?? '';
+                        final eligible = tSport.isEmpty
+                            ? _teams
+                            : _teams.where((t) => '${t['sport_id'] ?? ''}' == tSport).toList();
+                        return Column(children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: teamAId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Team A'),
+                            items: [
+                              const DropdownMenuItem(value: '', child: Text('None')),
+                              for (final t in eligible)
+                                if ('${t['id']}' != teamBId)
+                                  DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                            ],
+                            onChanged: (v) => setM(() => teamAId = v ?? ''),
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            initialValue: teamBId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Team B'),
+                            items: [
+                              const DropdownMenuItem(value: '', child: Text('None')),
+                              for (final t in eligible)
+                                if ('${t['id']}' != teamAId)
+                                  DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                            ],
+                            onChanged: (v) => setM(() => teamBId = v ?? ''),
+                          ),
+                        ]);
+                      }),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
-                        initialValue: teamBId,
+                        initialValue: venueId,
                         isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Team B'),
+                        decoration: const InputDecoration(labelText: 'Venue'),
                         items: [
                           const DropdownMenuItem(value: '', child: Text('None')),
-                          for (final t in _teams)
-                            DropdownMenuItem(value: '${t['id']}', child: Text('${t['name']}')),
+                          for (final v in _venues)
+                            DropdownMenuItem(value: '${v['id']}', child: Text('${v['name']}')),
                         ],
-                        onChanged: (v) => setM(() => teamBId = v ?? ''),
+                        onChanged: (v) => setM(() => venueId = v ?? ''),
                       ),
                       const SizedBox(height: 14),
                       DateTimeField(
@@ -362,6 +419,9 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
         'team_a_id': teamAId.isEmpty ? null : teamAId,
         'team_b_id': teamBId.isEmpty ? null : teamBId,
         'scheduled_at': scheduledAt,
+        'venue_id': venueId.isEmpty ? null : venueId,
+        'match_type': matchType,
+        'round_note': roundCtrl.text.trim().isEmpty ? null : roundCtrl.text.trim(),
         'status': status,
       };
       if (editing != null) {

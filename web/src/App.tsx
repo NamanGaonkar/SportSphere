@@ -133,9 +133,11 @@ const NAV_SECTIONS: {
   },
   {
     section: 'Athlete Care',
+    // Visible to every staff role so the section shows in the sidebar for
+    // all of them (athletes see their own data through My Profile).
     items: [
-      { to: '/performance', label: 'Performance', icon: PerformanceIcon, roles: ['Admin', 'Coach'] },
-      { to: '/medical', label: 'Medical', icon: MedicalIcon, roles: ['Admin', 'Coach', 'HR'] },
+      { to: '/performance', label: 'Performance', icon: PerformanceIcon, roles: ['Admin', 'Coach', 'HR', 'Finance', 'VenueManager'] },
+      { to: '/medical', label: 'Medical', icon: MedicalIcon, roles: ['Admin', 'Coach', 'HR', 'Finance', 'VenueManager'] },
     ],
   },
 ]
@@ -246,7 +248,7 @@ export default function App() {
               bgcolor: 'common.black',
               color: 'common.white',
               border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 4,
+              borderRadius: 2.5,
               boxShadow: '0 12px 40px rgba(13,13,13,0.35)',
               transition: (t) => t.transitions.create('width', { duration: 220 }),
               overflowX: 'hidden',

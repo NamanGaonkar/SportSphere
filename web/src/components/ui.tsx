@@ -28,10 +28,11 @@ export function PageHead({ title, sub, action }: { title: string; sub?: string; 
 
 // Dashboard stat card — same label / value / sub contract as the mobile app.
 // ~55% orange tint background so the cards pop (brand parity with mobile).
-export function StatCard({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
+export function StatCard({ label, value, sub, onClick }: { label: string; value: ReactNode; sub?: string; onClick?: () => void }) {
   return (
     <Paper
       elevation={0}
+      onClick={onClick}
       sx={{
         p: 2.5,
         height: '100%',
@@ -40,6 +41,11 @@ export function StatCard({ label, value, sub }: { label: string; value: ReactNod
         bgcolor: '#FFF1E7',
         border: '1px solid rgba(255,106,19,0.25)',
         borderRadius: 3,
+        // Clickable cards act as quick links into their module.
+        ...(onClick
+          ? { cursor: 'pointer', transition: 'transform .12s, box-shadow .12s',
+              '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 22px rgba(255,106,19,0.18)', borderColor: 'rgba(255,106,19,0.5)' } }
+          : {}),
       }}
     >
       <Typography

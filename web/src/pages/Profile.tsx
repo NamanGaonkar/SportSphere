@@ -39,6 +39,7 @@ export default function Profile() {
 
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
+  const [phone, setPhone] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -55,11 +56,12 @@ export default function Profile() {
     setError('')
     const { data: p } = await supabase
       .from('profiles')
-      .select('full_name, contact_info, avatar_url')
+      .select('full_name, contact_info, phone, avatar_url')
       .eq('id', uid)
       .single()
     setName((p?.full_name as string) ?? '')
     setContact((p?.contact_info as string) ?? '')
+    setPhone((p?.phone as string) ?? '')
     setAvatarUrl((p?.avatar_url as string) ?? null)
 
     if (role === 'Athlete') {
@@ -132,7 +134,11 @@ export default function Profile() {
     setMsg('')
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: name.trim(), contact_info: contact.trim() || null })
+      .update({
+        full_name: name.trim(),
+        contact_info: contact.trim() || null,
+        phone: phone.trim() || null,
+      })
       .eq('id', uid)
     setSaving(false)
     if (error) setError(error.message)
@@ -218,7 +224,9 @@ export default function Profile() {
           <Section title="Personal details">
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
               <TextField label="Full name" value={name} onChange={(e) => setName(e.target.value)} />
-              <TextField label="Contact (phone / email)" value={contact} onChange={(e) => setContact(e.target.value)} />
+              <TextField label="Email" type="email" value={contact} onChange={(e) => setContact(e.target.value)} />
+              {/* Separate phone field — parity with the mobile profile. */}
+              <TextField label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </Box>
             <Box sx={{ mt: 2 }}>
               <Button variant="contained" startIcon={<SaveIcon />} onClick={save} disabled={saving}>

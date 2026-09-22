@@ -34,18 +34,24 @@ type Match = {
   result: string | null
   scheduled_at: string | null
   tournament_id: string | null
+  venue_id: string | null
+  match_type: string | null
+  round_note: string | null
   team_a: { id: string; name: string; sport_id: string | null } | null
   team_b: { id: string; name: string } | null
   tournaments: { name: string } | null
+  venues: { name: string } | null
 }
 
-type Team = { id: string; name: string }
-type Tournament = { id: string; name: string }
+type Team = { id: string; name: string; sport_id: string | null }
+type Tournament = { id: string; name: string; sport_id: string | null }
+type Venue = { id: string; name: string }
 
 export default function Matches() {
   const [rows, setRows] = useState<Match[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [venues, setVenues] = useState<Venue[]>([])
   const [filterT, setFilterT] = useState('')
   const [filterS, setFilterS] = useState('')
   const { byId } = useSports()
@@ -53,7 +59,8 @@ export default function Matches() {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({
-    tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', status: 'Scheduled',
+    tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '',
+    venue_id: '', match_type: 'League Match', round_note: '', status: 'Scheduled',
   })
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
@@ -61,17 +68,19 @@ export default function Matches() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [m, t, tr] = await Promise.all([
+    const [m, t, tr, vn] = await Promise.all([
       supabase
         .from('matches')
-        .select('*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name)')
+        .select('*, team_a:teams!matches_team_a_id_fkey(id, name, sport_id), team_b:teams!matches_team_b_id_fkey(id, name), tournaments(name, sport_id), venues(name)')
         .order('scheduled_at', { ascending: false }),
-      supabase.from('teams').select('id, name').order('name'),
-      supabase.from('tournaments').select('id, name').order('name'),
+      supabase.from('teams').select('id, name, sport_id').order('name'),
+      supabase.from('tournaments').select('id, name, sport_id').order('name'),
+      supabase.from('venues').select('id, name').order('name'),
     ])
     setRows((m.data as unknown as Match[]) ?? [])
     setTeams((t.data as Team[]) ?? [])
     setTournaments((tr.data as Tournament[]) ?? [])
+    setVenues((vn.data as Venue[]) ?? [])
     setLoading(false)
   }, [])
 
@@ -91,11 +100,18 @@ export default function Matches() {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (form.team_a_id && form.team_a_id === form.team_b_id) {
+      setError('Team A and Team B must be different teams.')
+      return
+    }
     const payload = {
       tournament_id: form.tournament_id || null,
       team_a_id: form.team_a_id || null,
       team_b_id: form.team_b_id || null,
       scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+      venue_id: form.venue_id || null,
+      match_type: form.match_type || null,
+      round_note: form.round_note || null,
       status: form.status,
     }
     const { error } = editing
@@ -104,7 +120,7 @@ export default function Matches() {
     if (error) { setError(error.message); return }
     setShowForm(false)
     setEditing(null)
-    setForm({ tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', status: 'Scheduled' })
+    setForm({ tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', venue_id: '', match_type: 'League Match', round_note: '', status: 'Scheduled' })
     load()
   }
 
@@ -137,14 +153,26 @@ export default function Matches() {
         team_a_id: m.team_a?.id ?? '',
         team_b_id: m.team_b?.id ?? '',
         scheduled_at: m.scheduled_at ? m.scheduled_at.slice(0, 16) : '',
-        status: m.status,
+        venue_id: m.venue_id ?? '',
+        match_type: m.match_type ?? 'League Match',
+        round_note: m.round_note ?? '',
+        status: m.status === 'Live' ? 'Scheduled' : m.status,
       })
     } else {
       setEditing(null)
-      setForm({ tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', status: 'Scheduled' })
+      setForm({ tournament_id: '', team_a_id: '', team_b_id: '', scheduled_at: '', venue_id: '', match_type: 'League Match', round_note: '', status: 'Scheduled' })
     }
     setShowForm(true)
   }
+
+  // Picking a tournament narrows team options to that tournament's sport
+  // (tester round 2 #9); picking a sport filter narrows them too.
+  const formSportId =
+    (tournaments.find((t) => t.id === form.tournament_id)?.sport_id) || ''
+  const eligibleTeams = useMemo(
+    () => teams.filter((t) => !formSportId || t.sport_id === formSportId),
+    [teams, formSportId],
+  )
 
   const fmt = (iso: string | null) =>
     iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-'
@@ -153,7 +181,7 @@ export default function Matches() {
     <Box>
       <PageHead
         title="Fixtures & Results"
-        sub="Schedule matches, update live scores, record results."
+        sub="Schedule matches, record scores per sport, log results."
         action={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => openEdit()}>
             Add Match
@@ -189,7 +217,9 @@ export default function Matches() {
                   <TableRow>
                     <TableCell>Match</TableCell>
                     <TableCell>Sport</TableCell>
+                    <TableCell>Type</TableCell>
                     <TableCell>Tournament</TableCell>
+                    <TableCell>Venue</TableCell>
                     <TableCell>When</TableCell>
                     <TableCell>Score</TableCell>
                     <TableCell>Status</TableCell>
@@ -203,7 +233,9 @@ export default function Matches() {
                       <TableRow key={m.id} hover>
                         <TableCell>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</TableCell>
                         <TableCell>{byId(m.team_a?.sport_id) || '-'}</TableCell>
+                        <TableCell>{m.match_type ?? 'League Match'}{m.round_note ? ` - ${m.round_note}` : ''}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{m.tournaments?.name ?? '-'}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{m.venues?.name ?? '-'}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{fmt(m.scheduled_at)}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
@@ -227,7 +259,9 @@ export default function Matches() {
                               select size="small" defaultValue={m.status} sx={{ minWidth: 128 }}
                               onChange={(e) => setStatus(m, e.target.value)}
                             >
-                              {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                              {/* No Live option: scores are final results entered
+                                  after play, not a live tracker (tester request). */}
+                              {['Scheduled', 'Completed', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                             </TextField>
                           </Box>
                         </TableCell>
@@ -262,21 +296,39 @@ export default function Matches() {
           <DialogTitle>{editing ? 'Edit Match' : 'Add Match'}</DialogTitle>
           <DialogContent dividers>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
-              <TextField select label="Tournament" value={form.tournament_id} onChange={(e) => setForm({ ...form, tournament_id: e.target.value })} fullWidth>
-                <MenuItem value="">None</MenuItem>
+              <TextField select label="Tournament" value={form.tournament_id} onChange={(e) => setForm({ ...form, tournament_id: e.target.value, team_a_id: '', team_b_id: '' })} fullWidth>
+                <MenuItem value="">None (friendly / practice)</MenuItem>
                 {tournaments.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
               </TextField>
-              <TextField select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
-                {['Scheduled', 'Live', 'Completed', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              <TextField select label="Match type" value={form.match_type} onChange={(e) => setForm({ ...form, match_type: e.target.value })} fullWidth>
+                {['League Match', 'Tournament Match', 'Quarter Final', 'Semi Final', 'Final', 'Friendly', 'Practice Match'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </TextField>
-              <TextField select label="Team A" value={form.team_a_id} onChange={(e) => setForm({ ...form, team_a_id: e.target.value })} fullWidth>
+              <TextField
+                select
+                label="Team A"
+                value={form.team_a_id}
+                onChange={(e) => setForm({ ...form, team_a_id: e.target.value })}
+                fullWidth
+                // Only teams eligible for the tournament's sport are offered.
+              >
                 <MenuItem value="">None</MenuItem>
-                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                {eligibleTeams.filter((t) => t.id !== form.team_b_id).map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
               </TextField>
-              <TextField select label="Team B" value={form.team_b_id} onChange={(e) => setForm({ ...form, team_b_id: e.target.value })} fullWidth>
+              <TextField
+                select
+                label="Team B"
+                value={form.team_b_id}
+                onChange={(e) => setForm({ ...form, team_b_id: e.target.value })}
+                fullWidth
+              >
                 <MenuItem value="">None</MenuItem>
-                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                {eligibleTeams.filter((t) => t.id !== form.team_a_id).map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
               </TextField>
+              <TextField select label="Venue" value={form.venue_id} onChange={(e) => setForm({ ...form, venue_id: e.target.value })} fullWidth>
+                <MenuItem value="">None</MenuItem>
+                {venues.map((v) => <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>)}
+              </TextField>
+              <TextField label="Round note (e.g. Leg 2)" value={form.round_note} onChange={(e) => setForm({ ...form, round_note: e.target.value })} fullWidth />
               <TextField
                 type="datetime-local" label="Scheduled at" value={form.scheduled_at}
                 onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}

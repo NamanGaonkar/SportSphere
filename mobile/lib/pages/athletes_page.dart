@@ -151,8 +151,13 @@ class _AthletesPageState extends State<AthletesPage> {
                         DataCell(Text(_sportNames(r))),
                         DataCell(Text('${((r['teams'] ?? {}) as Map)['name'] ?? '-'}')),
                         DataCell(Text('${_age(r['dob']) ?? '-'}')),
-                        DataCell(BadgeChip(medical.isEmpty ? 'OK' : (medical.length > 24 ? '${medical.substring(0, 24)}...' : medical),
-                            color: medical.isEmpty ? const Color(0xFF2E7D32) : const Color(0xFFB26A00))),
+                        // No note = no badge at all (a blank note used to
+                        // read as a fake "OK" status — misleading).
+                        if (medical.isNotEmpty)
+                          DataCell(BadgeChip(medical.length > 24 ? '${medical.substring(0, 24)}...' : medical,
+                              color: const Color(0xFFB26A00)))
+                        else
+                          const DataCell(Text('-', style: TextStyle(color: Colors.black38))),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(
                             visualDensity: VisualDensity.compact,

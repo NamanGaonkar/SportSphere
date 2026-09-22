@@ -141,6 +141,82 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  Future<void> _createAccount() async {
+    final email = TextEditingController();
+    final pw = TextEditingController();
+    final name = TextEditingController();
+    final dept = TextEditingController();
+    String role = 'HR';
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Create account', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 14),
+                  TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
+                  const SizedBox(height: 10),
+                  TextField(controller: pw, obscureText: true, decoration: const InputDecoration(labelText: 'Password (min 6 chars)')),
+                  const SizedBox(height: 10),
+                  TextField(controller: name, decoration: const InputDecoration(labelText: 'Full name')),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: const InputDecoration(labelText: 'Role'),
+                    items: [for (final x in _roles) DropdownMenuItem(value: x, child: Text(x))],
+                    onChanged: (v) => setSheet(() => role = v ?? 'HR'),
+                  ),
+                  if (role == 'HR' || role == 'Finance' || role == 'VenueManager') ...[
+                    const SizedBox(height: 10),
+                    TextField(controller: dept, decoration: const InputDecoration(labelText: 'Department')),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Create'))),
+                  ]),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (ok != true || email.text.trim().isEmpty || pw.text.length < 6) {
+      if (ok == true && mounted) {
+        showSnack(context, 'Password must be at least 6 characters.', error: true);
+      }
+      return;
+    }
+    if (!mounted) return;
+    try {
+      final createdEmail = email.text.trim();
+      await client.rpc('admin_create_user', params: {
+        'p_email': createdEmail,
+        'p_password': pw.text,
+        'p_name': name.text.trim(),
+        'p_role': role,
+        'p_department': dept.text.trim().isEmpty ? null : dept.text.trim(),
+        'p_designation': null,
+      });
+      if (!mounted) return;
+      showSnack(context, 'Account created for $createdEmail');
+      _load();
+    } catch (e) {
+      if (mounted) showSnack(context, 'Create failed: $e', error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rows = _filtered;
@@ -149,8 +225,16 @@ class _UsersPageState extends State<UsersPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const PageHead('User Management',
-              sub: 'Manage every account: names, roles and contacts. Applies on web and mobile instantly.'),
+          PageHead(
+            'User Management',
+            sub: 'Manage accounts and create staff logins. Applies on web and mobile instantly.',
+            action: FilledButton.icon(
+              onPressed: _createAccount,
+              icon: const Icon(Icons.person_add_alt_1, size: 18),
+              label: const Text('Add'),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+            ),
+          ),
           TextField(
             onChanged: (v) => setState(() => _q = v),
             decoration: const InputDecoration(

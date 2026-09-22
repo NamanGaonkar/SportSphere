@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useSports, useRealtimeTable } from '../lib/hooks'
 import { attendanceWindow } from '../lib/dates'
@@ -49,6 +50,7 @@ type MedRow = { id: string; athlete_id: string; type: string; cleared: boolean; 
 // Dashboard metrics are shared with the mobile app (same stats, same order,
 // same sections — parity is intentional and enforced on both sides).
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [counts, setCounts] = useState<Counts>({ athletes: 0, coaches: 0, teams: 0, tournaments: 0 })
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [attendance, setAttendance] = useState<{ day: string; present: number | null }[]>([])
@@ -151,10 +153,11 @@ export default function Dashboard() {
           mb: 2,
         }}
       >
-        <StatCard label="Athletes" value={counts.athletes} sub="Active roster" />
-        <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" />
-        <StatCard label="Teams" value={counts.teams} sub="Registered squads" />
-        <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" />
+        {/* Stat cards double as quick links into their modules. */}
+        <StatCard label="Athletes" value={counts.athletes} sub="Active roster" onClick={() => navigate('/athletes')} />
+        <StatCard label="Coaches" value={counts.coaches} sub="Across all sports" onClick={() => navigate('/coaches')} />
+        <StatCard label="Teams" value={counts.teams} sub="Registered squads" onClick={() => navigate('/teams')} />
+        <StatCard label="Tournaments" value={counts.tournaments} sub="All levels" onClick={() => navigate('/tournaments')} />
       </Box>
 
       {/* Ops strip: inventory / procurement / medical at a glance */}
@@ -170,9 +173,10 @@ export default function Dashboard() {
           label="Equipment alerts"
           value={lowStockCount}
           sub={lowStockCount > 0 ? 'Items at or below min stock' : 'All stock levels healthy'}
+          onClick={() => navigate('/inventory')}
         />
-        <StatCard label="POs awaiting delivery" value={pendingPO} sub="Marked Ordered" />
-        <StatCard label="Athletes not cleared" value={notCleared} sub="From latest medical records" />
+        <StatCard label="POs awaiting delivery" value={pendingPO} sub="Marked Ordered" onClick={() => navigate('/purchases')} />
+        <StatCard label="Athletes not cleared" value={notCleared} sub="From latest medical records" onClick={() => navigate('/medical')} />
       </Box>
 
       <Box

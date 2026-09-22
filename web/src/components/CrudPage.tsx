@@ -26,14 +26,16 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { supabase } from '../lib/supabase'
+import { useCanEdit } from '../lib/permissions'
 import { PageHead, EmptyState, LoadingState } from './ui'
 import ExpandableRow from './ExpandableRow'
 import dataTableSx from './tableSx'
+import FileField from './FileField'
 
 export type FieldDef = {
   key: string
   label: string
-  type?: 'text' | 'number' | 'date' | 'datetime-local' | 'textarea' | 'select' | 'checkbox'
+  type?: 'text' | 'number' | 'date' | 'datetime-local' | 'time' | 'textarea' | 'select' | 'checkbox' | 'file'
   options?: string[]
   source?: { table: string; select: string; valueKey?: string; labelPath: string }
   required?: boolean
@@ -87,6 +89,7 @@ export default function CrudPage({
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const canEdit = useCanEdit()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -141,6 +144,9 @@ export default function CrudPage({
       const v = row[f.key]
       if (f.type === 'datetime-local' || f.type === 'date') {
         init[f.key] = isoToLocalInput(v as string | null, f.type)
+      } else if (f.type === 'time') {
+        // Stored as a timestamp; edit shows just the clock time.
+        init[f.key] = v ? new Date(String(v)).toTimeString().slice(0, 5) : ''
       } else if (f.type === 'checkbox') {
         init[f.key] = Boolean(v)
       } else if (f.type === 'textarea' && f.key === 'items') {
@@ -162,6 +168,12 @@ export default function CrudPage({
       let v = form[f.key]
       if (f.type === 'number') v = v === '' || v === null ? null : Number(v)
       if (f.type === 'datetime-local' && v) v = new Date(String(v)).toISOString()
+      if (f.type === 'time' && v) {
+        // Time-only fields combine with the row's scheduled date (the DB
+        // column is a timestamp); without a date they'd be unparseable.
+        const day = String(form.scheduled_date || new Date().toISOString().slice(0, 10))
+        v = new Date(`${day}T${v}`).toISOString()
+      }
       if (f.type === 'checkbox') v = Boolean(v)
       if (f.type === 'select' && v === '') v = null
       if (f.key === 'items' && typeof v === 'string') {
@@ -193,6 +205,9 @@ export default function CrudPage({
     }
     if (f.type === 'datetime-local' && v) {
       return new Date(String(v)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    }
+    if (f.type === 'time' && v) {
+      return new Date(String(v)).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
     }
     if (f.type === 'date' && v) {
       return new Date(String(v) + 'T00:00:00').toLocaleDateString()
@@ -245,7 +260,7 @@ export default function CrudPage({
                   <TableRow>
                     <TableCell padding="checkbox" sx={{ width: 40 }} />
                     {columns.map((c) => <TableCell key={c.key}>{c.label}</TableCell>)}
-                    <TableCell align="right">Actions</TableCell>
+                    {canEdit && <TableCell align="right" sx={{ width: 96 }}>Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -267,13 +282,25 @@ export default function CrudPage({
                             {c.render ? c.render(row) : displayValue(fields.find((f) => f.key === c.key) ?? { key: c.key, label: c.label }, row)}
                           </TableCell>
                         ))}
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
-                          <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit">
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" color="error" onClick={() => remove(String(row.id))} aria-label="Delete">
-                            <DeleteOutlinedIcon fontSize="small" />
-                          </IconButton>
+                        <TableCell
+                          align="right"
+                          onClick={(e) => e.stopPropagation()}
+                          sx={
+                            canEdit
+                              ? { whiteSpace: 'nowrap', width: 96, pr: 2 }
+                              : { width: 96, pr: 2 }
+                          }
+                        >
+                          {canEdit && (
+                            <>
+                              <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit">
+                                <EditOutlinedIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={() => remove(String(row.id))} aria-label="Delete">
+                                <DeleteOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </>
+                          )}
                         </TableCell>
                       </ExpandableRow>
                     ))}
@@ -310,6 +337,12 @@ export default function CrudPage({
                       }
                       label={f.label}
                     />
+                  ) : f.type === 'file' ? (
+                    <FileField
+                      label={f.label}
+                      value={String(form[f.key] ?? '')}
+                      onChange={(url) => setForm({ ...form, [f.key]: url })}
+                    />
                   ) : f.type === 'textarea' ? (
                     <TextField
                       label={f.label}
@@ -340,7 +373,7 @@ export default function CrudPage({
                       onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                       fullWidth
                       required={f.required}
-                      slotProps={f.type === 'date' || f.type === 'datetime-local' ? { inputLabel: { shrink: true } } : undefined}
+                      slotProps={f.type === 'date' || f.type === 'datetime-local' || f.type === 'time' ? { inputLabel: { shrink: true } } : undefined}
                     />
                   )}
                 </Box>

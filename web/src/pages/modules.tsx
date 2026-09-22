@@ -10,6 +10,7 @@ const venueSource = { table: 'venues', select: 'id, name', labelPath: 'name' }
 const coachSource = { table: 'coaches', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
 const athleteSource = { table: 'athletes', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
 const staffSource = { table: 'staff', select: 'id, profile:profiles(full_name)', labelPath: 'profile.full_name' }
+const vendorSource = { table: 'vendors', select: 'id, name', labelPath: 'name' }
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -53,8 +54,10 @@ export function Housekeeping() {
     { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource },
     { key: 'assigned_to', label: 'Assigned to' },
     { key: 'scheduled_date', label: 'Scheduled date', type: 'date' },
-    { key: 'start_time', label: 'Start time', type: 'datetime-local' },
-    { key: 'end_time', label: 'End time', type: 'datetime-local' },
+    // Time-only fields: the scheduled date already carries the day, so the
+    // start/end inputs must not ask for a second date (tester round 2 #16).
+    { key: 'start_time', label: 'Start time', type: 'time' },
+    { key: 'end_time', label: 'End time', type: 'time' },
     { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Done'] },
     { key: 'notes', label: 'Notes', type: 'textarea', fullWidth: true },
   ]
@@ -71,11 +74,12 @@ export function Housekeeping() {
 
 export function VenueMaintenance() {
   const venueOptions = useSourceOptions(venueSource)
+  const staffOptions = useSourceOptions(staffSource)
   const fields: FieldDef[] = [
     { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource, required: true },
     { key: 'issue_title', label: 'Issue', required: true },
     { key: 'description', label: 'Description', type: 'textarea', fullWidth: true },
-    { key: 'assigned_to', label: 'Assigned staff' },
+    { key: 'assigned_to', label: 'Assigned staff/vendor' },
     { key: 'reported_date', label: 'Reported date', type: 'date' },
     { key: 'completed_date', label: 'Completed date', type: 'date' },
     { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High'] },
@@ -139,10 +143,12 @@ export function VenueBookings() {
     { key: 'venue_id', label: 'Venue', render: (r) => venueOptions.get(String(r.venue_id ?? '')) ?? '-' },
     { key: 'start_time', label: 'From', render: (r) => (r.start_time ? new Date(String(r.start_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-') },
     { key: 'end_time', label: 'To', render: (r) => (r.end_time ? new Date(String(r.end_time)).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-') },
+    // Tournament blocks show their full reservation range (tester #1).
+    { key: 'is_tournament_block', label: 'Type', render: (r) => (r.is_tournament_block ? <Badge color="error">Tournament block</Badge> : <Badge color="default">Slot booking</Badge>) },
     { key: 'purpose', label: 'Purpose' },
     { key: 'status', label: 'Status', render: (r) => <Badge color={statusColor(String(r.status ?? ''))}>{String(r.status ?? '-')}</Badge> },
   ]
-  return <CrudPage title="Venue Booking" sub="Booking workflow with availability checks - overlapping bookings are rejected automatically." table="venue_bookings" orderBy="start_time" columns={columns} fields={fields} searchKeys={['purpose', 'title']} />
+  return <CrudPage title="Venue Booking" sub="Slot bookings and full tournament reservations - the database rejects conflicting bookings automatically." table="venue_bookings" orderBy="start_time" columns={columns} fields={fields} searchKeys={['purpose', 'title']} />
 }
 
 export function Training() {
@@ -153,7 +159,10 @@ export function Training() {
     { key: 'sport_id', label: 'Sport', type: 'select', source: sportSource },
     { key: 'coach_id', label: 'Coach', type: 'select', source: coachSource },
     { key: 'team_id', label: 'Team', type: 'select', source: teamSource },
-    { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource },
+    { key: 'venue_id', label: 'Venue / destination', type: 'select', source: venueSource },
+    { key: 'frequency', label: 'Frequency', type: 'select', options: ['Daily', 'Weekly', 'Monthly', 'One-off'] },
+    { key: 'start_date', label: 'Camp start', type: 'date' },
+    { key: 'end_date', label: 'Camp end', type: 'date' },
     { key: 'start_time', label: 'Starts', type: 'datetime-local' },
     { key: 'end_time', label: 'Ends', type: 'datetime-local' },
     { key: 'notes', label: 'Notes', type: 'textarea', fullWidth: true },
@@ -202,6 +211,7 @@ export function Medical() {
     { key: 'treatment', label: 'Treatment', fullWidth: true },
     { key: 'follow_up_date', label: 'Follow-up date', type: 'date' },
     { key: 'details', label: 'Details', type: 'textarea', required: true, fullWidth: true },
+    { key: 'certificate_url', label: 'Medical certificate (PDF)', type: 'file', fullWidth: true },
   ]
   const columns: ColumnDef[] = [
     { key: 'athlete_id', label: 'Athlete' },
@@ -235,6 +245,7 @@ export function EventsPage() {
 export function Transport() {
   const fields: FieldDef[] = [
     { key: 'purpose', label: 'Purpose', required: true },
+    { key: 'destination', label: 'Destination', required: true },
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'driver', label: 'Driver' },
     { key: 'team_id', label: 'Team', type: 'select', source: teamSource },
@@ -244,19 +255,22 @@ export function Transport() {
   ]
   const columns: ColumnDef[] = [
     { key: 'purpose', label: 'Purpose' },
+    { key: 'destination', label: 'Destination' },
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'driver', label: 'Driver' },
     { key: 'depart_at', label: 'Departure', render: (r) => r.depart_at ? new Date(String(r.depart_at)).toLocaleString() : '-' },
     statusCol('status', 'Status'),
   ]
-  return <CrudPage title="Transport" sub="Team travel - buses, vehicles, drivers." table="transport" columns={columns} fields={fields} searchKeys={['purpose', 'vehicle', 'driver']} />
+  return <CrudPage title="Transport" sub="Team travel - buses, vehicles, drivers and destinations." table="transport" columns={columns} fields={fields} searchKeys={['purpose', 'destination', 'vehicle', 'driver']} />
 }
 
 export function Accommodation() {
+  const teamOptions = useSourceOptions(teamSource)
   const fields: FieldDef[] = [
     { key: 'hotel', label: 'Hotel', required: true },
     { key: 'location', label: 'Location' },
     { key: 'team_id', label: 'Team', type: 'select', source: teamSource },
+    { key: 'event_note', label: 'Staying for (tournament / match)', fullWidth: true },
     { key: 'check_in', label: 'Check-in', type: 'date' },
     { key: 'check_out', label: 'Check-out', type: 'date' },
     { key: 'rooms', label: 'Rooms', type: 'number' },
@@ -265,36 +279,47 @@ export function Accommodation() {
   const columns: ColumnDef[] = [
     { key: 'hotel', label: 'Hotel' },
     { key: 'location', label: 'Location' },
+    { key: 'team_id', label: 'Team', render: (r) => String(teamOptions.get(String(r.team_id ?? '')) ?? '-') },
+    { key: 'event_note', label: 'Staying for', render: (r) => String(r.event_note ?? '-') },
     { key: 'check_in', label: 'Check-in' },
     { key: 'check_out', label: 'Check-out' },
     { key: 'rooms', label: 'Rooms' },
     statusCol('status', 'Status'),
   ]
-  return <CrudPage title="Accommodation" sub="Hotel stays for teams during travel." table="accommodation" columns={columns} fields={fields} searchKeys={['hotel', 'location']} />
+  return <CrudPage title="Accommodation" sub="Hotel stays for teams and staff, linked to the tournament or match they attend." table="accommodation" columns={columns} fields={fields} searchKeys={['hotel', 'location', 'event_note']} />
 }
 
 export function Expenses() {
+  const vendorOptions = useSourceOptions(vendorSource)
   const fields: FieldDef[] = [
-    { key: 'category', label: 'Category', type: 'select', options: ['Equipment', 'Travel', 'Salaries', 'Venue', 'Other'], required: true },
+    { key: 'category', label: 'Category', type: 'select', options: ['Equipment', 'Travel', 'Salaries', 'Venue', 'Accommodation', 'Awards & Prizes', 'Other'], required: true },
+    { key: 'vendor_id', label: 'Vendor (if purchased)', type: 'select', source: vendorSource },
+    { key: 'items_note', label: 'Items / services', fullWidth: true },
     { key: 'amount', label: 'Amount (INR)', type: 'number', required: true },
     { key: 'date', label: 'Date', type: 'date' },
+    { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Approved', 'Rejected'] },
     { key: 'description', label: 'Description', type: 'textarea', fullWidth: true },
     { key: 'approved_by', label: 'Approved by' },
   ]
   const columns: ColumnDef[] = [
     { key: 'category', label: 'Category' },
+    { key: 'vendor_id', label: 'Vendor', render: (r) => vendorOptions.get(String(r.vendor_id ?? '')) ?? '-' },
+    { key: 'items_note', label: 'Items / services' },
     moneyCol('amount', 'Amount'),
     { key: 'date', label: 'Date' },
-    { key: 'description', label: 'Description' },
+    { key: 'status', label: 'Status', render: (r) => <Badge color={r.status === 'Approved' ? 'success' : r.status === 'Rejected' ? 'error' : 'warning'}>{String(r.status ?? 'Pending')}</Badge> },
     { key: 'approved_by', label: 'Approved by' },
   ]
-  return <CrudPage title="Finance & Expenses" sub="Organization spending by category." table="expenses" columns={columns} fields={fields} searchKeys={['category', 'description']} />
+  return <CrudPage title="Finance & Expenses" sub="Spending across every module, including vendor purchases and accommodation costs." table="expenses" columns={columns} fields={fields} searchKeys={['category', 'description', 'items_note']} />
 }
 
 export function Activities() {
+  const venueOptions = useSourceOptions(venueSource)
   const fields: FieldDef[] = [
     { key: 'title', label: 'Title', required: true },
     { key: 'school', label: 'School' },
+    { key: 'coordinator', label: 'Coordinator (staff member)' },
+    { key: 'venue_id', label: 'Venue', type: 'select', source: venueSource },
     { key: 'date', label: 'Date', type: 'date' },
     { key: 'participants', label: 'Participants', type: 'number' },
     { key: 'description', label: 'Description', type: 'textarea', fullWidth: true },
@@ -302,8 +327,10 @@ export function Activities() {
   const columns: ColumnDef[] = [
     { key: 'title', label: 'Title' },
     { key: 'school', label: 'School' },
+    { key: 'coordinator', label: 'Coordinator' },
+    { key: 'venue_id', label: 'Venue', render: (r) => venueOptions.get(String(r.venue_id ?? '')) ?? '-' },
     { key: 'date', label: 'Date' },
     { key: 'participants', label: 'Participants' },
   ]
-  return <CrudPage title="School Sports Activities" sub="School-level events and outreach programs." table="school_activities" columns={columns} fields={fields} searchKeys={['title', 'school']} />
+  return <CrudPage title="School Sports Activities" sub="School-level events and outreach, kept separate from professional fixtures." table="school_activities" columns={columns} fields={fields} searchKeys={['title', 'school', 'coordinator']} />
 }

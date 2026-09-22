@@ -212,7 +212,7 @@ export default function Athletes() {
                         key={r.id}
                         chips={[
                           { label: r.teams?.name ?? 'No team', color: 'primary' },
-                          { label: r.medical_notes ? 'Medical notes' : 'Medically OK', color: r.medical_notes ? 'warning' : 'success' },
+                          ...(r.medical_notes ? [{ label: 'Medical notes', color: 'warning' as const }] : []),
                         ]}
                         detail={[
                           { k: 'Full name', v: r.profile?.full_name ?? '-' },
@@ -240,7 +240,7 @@ export default function Athletes() {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           {r.medical_notes
                             ? <Badge color="warning">{r.medical_notes.length > 28 ? r.medical_notes.slice(0, 28) + '...' : r.medical_notes}</Badge>
-                            : <Badge color="success">OK</Badge>}
+                            : <span style={{ color: 'rgba(0,0,0,0.35)' }}>-</span>}
                         </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                           <IconButton size="small" onClick={() => openEdit(r)} aria-label="Edit">
