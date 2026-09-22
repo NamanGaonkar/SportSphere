@@ -23,3 +23,5 @@ build/
 
 web/tsconfig.tsbuildinfo
 scripts/__pycache__/
+
+changes.txt
