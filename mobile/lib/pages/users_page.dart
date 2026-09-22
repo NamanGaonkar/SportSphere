@@ -58,7 +58,7 @@ class _UsersPageState extends State<UsersPage> {
     try {
       final data = await client
           .from('profiles')
-          .select('id, full_name, role, contact_info, phone, created_at, athletes(id), coaches(id), staff(id)')
+          .select('id, full_name, role, contact_info, phone, avatar_url, created_at, athletes(id), coaches(id), staff(id)')
           .order('created_at', ascending: false);
       // Auth emails live outside profiles; admin-only RPC surfaces them.
       final emails = await client.rpc('admin_list_emails');
@@ -260,10 +260,16 @@ class _UsersPageState extends State<UsersPage> {
                             ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: _roleColor('${r['role']}').withValues(alpha: 0.15),
-                                child: Text(
-                                  '${r['full_name']}'.isNotEmpty ? '${r['full_name']}'.trim().split(RegExp(r'\\s+')).map((p) => p[0]).take(2).join().toUpperCase() : '?',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _roleColor('${r['role']}')),
-                                ),
+                                // Uploaded profile photo when present (web parity),
+                                // initials otherwise.
+                                backgroundImage:
+                                    (r['avatar_url'] as String?)?.isNotEmpty == true ? NetworkImage(r['avatar_url'] as String) : null,
+                                child: (r['avatar_url'] as String?)?.isNotEmpty == true
+                                    ? null
+                                    : Text(
+                                        '${r['full_name']}'.isNotEmpty ? '${r['full_name']}'.trim().split(RegExp(r'\\s+')).map((p) => p[0]).take(2).join().toUpperCase() : '?',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _roleColor('${r['role']}')),
+                                      ),
                               ),
                               title: Text('${r['full_name']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                               subtitle: Text('${r['email'] ?? '-'} - ${r['phone'] ?? r['contact_info'] ?? 'no phone'}',

@@ -653,6 +653,14 @@ class _DashboardHomeState extends State<DashboardHome> {
     }
   }
 
+  /// Tournament + date line for a Recent Matches tile (compact, ellipsized).
+  String _matchMeta(DbRow m) {
+    final t = DateTime.tryParse('${m['scheduled_at'] ?? ''}')?.toLocal();
+    final date = t == null ? '-' : fmtDateTime(t.toIso8601String());
+    final tour = ((m['tournaments'] ?? {}) as Map)['name']?.toString();
+    return tour == null || tour.isEmpty ? date : '$tour - $date';
+  }
+
   Map<String, int> get _teamsBySport {
     final m = <String, int>{};
     for (final t in _teamRows) {
@@ -710,38 +718,53 @@ class _DashboardHomeState extends State<DashboardHome> {
                 ? const EmptyState('No matches scheduled yet.')
                 : Column(
                     children: [
+                      // Two-line tile per match: teams + status on top,
+                      // score + tournament + date below. Long names and
+                      // score strings get their own line — no more cramped
+                      // single-row squeezing.
                       for (final m in _matches)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                  '${((m['team_a'] ?? {}) as Map)['name'] ?? 'TBD'} vs ${((m['team_b'] ?? {}) as Map)['name'] ?? 'TBD'}',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${((m['team_a'] ?? {}) as Map)['name'] ?? 'TBD'} vs ${((m['team_b'] ?? {}) as Map)['name'] ?? 'TBD'}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  BadgeChip('${m['status']}',
+                                      color: statusColor('${m['status']}')),
+                                ],
                               ),
-                              Expanded(
-                                flex: 2,
-                                child: Text('${(m['tournaments'] ?? {})['name'] ?? '-'}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    scoreDisplayFor(m),
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: scoreIsEmpty(m) ? Colors.black26 : Brand.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _matchMeta(m),
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              // Sport-correct score line — same source as web
-                              // (DB score_display, sport-aware fallback).
-                              Text(
-                                scoreDisplayFor(m),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: scoreIsEmpty(m) ? Colors.black26 : Brand.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              BadgeChip('${m['status']}',
-                                  color: statusColor('${m['status']}')),
+                              const Divider(height: 14),
                             ],
                           ),
                         ),

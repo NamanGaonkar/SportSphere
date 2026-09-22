@@ -206,12 +206,15 @@ class StatCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        // SizedBox.expand forces EVERY card in a row to the same height —
-        // long values ("Rs 12,34,567") previously stretched one card taller
-        // than its siblings (the unequal-boxes complaint).
-        child: SizedBox.expand(
+        // NOT SizedBox.expand: inside a Wrap, height constraints are
+        // unbounded and expand forces an infinite height, which threw in
+        // release and blanked every dashboard below its header. A fixed
+        // min height keeps cards in a row visually equal instead.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 112),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label.toUpperCase(),
@@ -227,9 +230,12 @@ class StatCard extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Colors.white)),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               if (sub != null)
-                Text(sub!, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.72))),
+                Text(sub!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.72))),
             ],
           ),
         ),
