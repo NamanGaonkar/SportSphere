@@ -251,9 +251,12 @@ class _HomeShellState extends State<HomeShell> {
   double _drawerOffset = 0.0;
   int _drawerSession = 0;
 
-  void _openDrawer() {
+  void _openDrawer(BuildContext scaffoldContext) {
     setState(() => _drawerSession++); // fresh controller -> restores offset
-    Scaffold.of(context).openDrawer();
+    // MUST use the Builder's context (inside the Scaffold). The State's own
+    // context sits ABOVE the Scaffold and Scaffold.of() throws on it —
+    // which silently killed every menu tap.
+    Scaffold.of(scaffoldContext).openDrawer();
   }
 
   static const _kPrefKey = 'sportsphere.nav.last';
@@ -458,7 +461,7 @@ class _HomeShellState extends State<HomeShell> {
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => _openDrawer(),
+            onPressed: () => _openDrawer(ctx),
           ),
         ),
         actions: [
@@ -555,6 +558,15 @@ class _DashboardHomeState extends State<DashboardHome> {
   Future<void> _load() async {
     final c = Supabase.instance.client;
     final uid = c.auth.currentUser?.id;
+    // One failing query can never blank the whole dashboard again: each
+    // future runs in its own error zone and yields [] / null on failure.
+    Future<dynamic> zone(Future<dynamic> f) async {
+      try {
+        return await f;
+      } catch (_) {
+        return <DbRow>[];
+      }
+    }
     try {
       // Guarantee sport names are in memory before the chart computes.
       if (!_sportsBound) {
@@ -562,39 +574,39 @@ class _DashboardHomeState extends State<DashboardHome> {
         await SportsCache.instance.ready;
       }
       final results = await Future.wait<dynamic>([
-        c.from('athletes').select('id'),
-        c.from('coaches').select('id'),
-        c.from('teams').select('id, sport_id'),
-        c.from('tournaments').select('id'),
-        c
+        zone(c.from('athletes').select('id')),
+        zone(c.from('coaches').select('id')),
+        zone(c.from('teams').select('id, sport_id')),
+        zone(c.from('tournaments').select('id')),
+        zone(c
             .from('matches')
             .select(
                 'id, status, score_a, score_b, score_display, scheduled_at, team_a:teams!matches_team_a_id_fkey(name, sport_id), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
-            .order('scheduled_at', ascending: false),
-        c
+            .order('scheduled_at', ascending: false)),
+        zone(c
             .from('attendance')
             .select('date, status')
-            .gte('date', DateTime.now().subtract(const Duration(days: 7)).toIso8601String().split('T').first),
+            .gte('date', DateTime.now().subtract(const Duration(days: 7)).toIso8601String().split('T').first)),
         // Roster = everyone attendance applies to (same as web).
-        c.from('profiles').select('id').inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager']),
+        zone(c.from('profiles').select('id').inFilter('role', ['Athlete', 'Coach', 'HR', 'Finance', 'VenueManager'])),
         if (uid != null)
-          c.from('profiles').select('full_name, role').eq('id', uid).maybeSingle()
+          zone(c.from('profiles').select('full_name, role').eq('id', uid).maybeSingle())
         else
           Future.value(null),
-        c.from('payroll').select('id, month, net, staff_id, coach_id, staff:staff_id(profile:profiles(full_name)), coach:coach_id(profile:profiles(full_name))').order('month', ascending: false).limit(6),
-        c.from('inventory_items').select('id, name, quantity, min_stock, condition'),
-        c.from('purchase_orders').select('id, status'),
-        c
+        zone(c.from('payroll').select('id, month, net, staff_id, coach_id, staff:staff_id(profile:profiles(full_name)), coach:coach_id(profile:profiles(full_name))').order('month', ascending: false).limit(6)),
+        zone(c.from('inventory_items').select('id, name, quantity, min_stock, condition')),
+        zone(c.from('purchase_orders').select('id', ) ),
+        zone(c
             .from('medical_records')
             .select('id, athlete_id, type, cleared, date, athletes(profile:profiles(full_name))')
             .order('date', ascending: false)
-            .limit(8),
+            .limit(8)),
         // Recent Awards & Achievements — same query/shape as web Dashboard.
-        c
+        zone(c
             .from('awards')
             .select('id, title, date, level, athletes(profile:profiles(full_name))')
             .order('date', ascending: false)
-            .limit(6),
+            .limit(6)),
       ]);
       if (!mounted) return;
 
