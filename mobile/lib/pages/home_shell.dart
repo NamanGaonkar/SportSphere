@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/scoring.dart';
 import '../data/sports.dart';
 import '../main.dart' show Brand;
 import '../widgets/common.dart';
@@ -132,11 +133,24 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
+/// Sport-correct score line for dashboard fixture rows — DB score_display
+/// when present, sport-aware fallback otherwise; '-' when unplayed.
+String scoreDisplayFor(Map m) {
+  final sportId = ((m['team_a'] ?? {}) as Map)['sport_id']?.toString();
+  final k = scoreKind(SportsCache.instance.name(sportId));
+  final scheduled = '${m['status'] ?? ''}' == 'Scheduled' || '${m['status'] ?? ''}' == 'Cancelled';
+  if ((m['score_display'] as String?)?.isNotEmpty == true) return m['score_display'].toString();
+  return formatScore(k, m, scheduled: scheduled);
+}
+
 class _HomeShellState extends State<HomeShell> {
   String? _role;
   String _current = 'Dashboard';
   List<_NavSection> _sections = const [];
   final Map<String, Widget> _pageCache = {};
+  // Scroll position of the drawer's nav list — kept across drawer
+  // open/close so reopening puts you exactly where you scrolled to.
+  final ScrollController _drawerScroll = ScrollController();
 
   static const _kPrefKey = 'sportsphere.nav.last';
 
@@ -187,6 +201,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   SharedPreferences? get _prefs => _prefsHolder;
+
+  @override
+  void dispose() {
+    _drawerScroll.dispose();
+    super.dispose();
+  }
 
   Future<void> _signOut() async {
     await Supabase.instance.client.auth.signOut();
@@ -267,6 +287,7 @@ class _HomeShellState extends State<HomeShell> {
                   const Divider(color: Colors.white12, height: 1),
                   Expanded(
                     child: ListView(
+                      controller: _drawerScroll,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       children: [
                         for (final s in _sections) ...[
@@ -487,7 +508,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         c
             .from('matches')
             .select(
-                'id, status, score_a, score_b, scheduled_at, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
+                'id, status, score_a, score_b, score_display, scheduled_at, team_a:teams!matches_team_a_id_fkey(name, sport_id), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
             .order('scheduled_at', ascending: false)
             .limit(6),
         c
@@ -636,8 +657,16 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 12, color: Colors.black54)),
                               ),
-                              Text('${m['score_a'] ?? 0} : ${m['score_b'] ?? 0}',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                              // Sport-correct score line — same source as web
+                              // (DB score_display, sport-aware fallback).
+                              Text(
+                                scoreDisplayFor(m),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: scoreIsEmpty(m) ? Colors.black26 : Brand.primary,
+                                ),
+                              ),
                               const SizedBox(width: 8),
                               BadgeChip('${m['status']}',
                                   color: statusColor('${m['status']}')),

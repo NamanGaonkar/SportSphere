@@ -195,28 +195,32 @@ class StatCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
-            const SizedBox(height: 6),
-            // FittedText keeps long values (e.g. "Rs 12,34,567") inside the
-            // card: the font shrinks to fit one line instead of overflowing.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(value,
+        // SizedBox.expand forces EVERY card in a row to the same height —
+        // long values ("Rs 12,34,567") previously stretched one card taller
+        // than its siblings (the unequal-boxes complaint).
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
                   style: const TextStyle(
-                      fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
-            ),
-            if (sub != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(sub!, style: const TextStyle(fontSize: 11.5, color: Colors.black45)),
+                      fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
+              const SizedBox(height: 6),
+              // FittedText keeps long values inside the card: the font
+              // shrinks to fit one line instead of overflowing.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value,
+                    style: const TextStyle(
+                        fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
               ),
-          ],
+              const Spacer(),
+              if (sub != null)
+                Text(sub!, style: const TextStyle(fontSize: 11.5, color: Colors.black45)),
+            ],
+          ),
         ),
       ),
     );
@@ -371,8 +375,19 @@ class PagedTable<T> extends StatefulWidget {
 
 class _PagedTableState<T> extends State<PagedTable<T>> {
   int _page = 0;
-  int _perPage = 10;
+  // 25 per page by default — 10 made every table feel like it was hiding
+  // data ("shows 10 rows in some part but can't show enough").
+  int _perPage = 25;
   int? _expandedIdx; // one expanded row at a time
+
+  @override
+  void didUpdateWidget(PagedTable<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // New data arrived (realtime or refresh): clamp instead of leaking the
+    // old page index past the end.
+    final maxPage = widget.items.isEmpty ? 0 : (widget.items.length - 1) ~/ _perPage;
+    if (_page > maxPage) _page = maxPage;
+  }
 
   void _toggle(int idx) {
     setState(() => _expandedIdx = _expandedIdx == idx ? null : idx);
@@ -554,7 +569,7 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
                 DropdownButton<int>(
                   value: _perPage,
                   underline: const SizedBox.shrink(),
-                  items: const [10, 25, 50]
+                  items: const [10, 25, 50, 100]
                       .map((n) => DropdownMenuItem(
                           value: n, child: Text('$n rows', style: TextStyle(fontSize: 12))))
                       .toList(),

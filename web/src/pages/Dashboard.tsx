@@ -25,6 +25,7 @@ type MatchRow = {
   status: string
   score_a: number | null
   score_b: number | null
+  score_display: string | null
   scheduled_at: string | null
   team_a: { name: string } | null
   team_b: { name: string } | null
@@ -74,7 +75,7 @@ export default function Dashboard() {
         supabase.from('tournaments').select('id', { count: 'exact', head: true }),
         supabase
           .from('matches')
-          .select('*, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
+          .select('*, score_display, team_a:teams!matches_team_a_id_fkey(name), team_b:teams!matches_team_b_id_fkey(name), tournaments(name)')
           .order('scheduled_at', { ascending: false })
           .limit(6),
         supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
@@ -205,7 +206,11 @@ export default function Dashboard() {
                     <TableRow key={m.id}>
                       <TableCell>{m.team_a?.name ?? 'TBD'} vs {m.team_b?.name ?? 'TBD'}</TableCell>
                       <TableCell sx={{ color: 'text.secondary' }}>{m.tournaments?.name ?? '-'}</TableCell>
-                      <TableCell>{m.score_a ?? 0} : {m.score_b ?? 0}</TableCell>
+                      <TableCell>
+                        {(m.score_a == null && m.score_b == null) || m.status === 'Scheduled'
+                          ? <Typography sx={{ color: 'text.disabled' }}>-</Typography>
+                          : <Box component="span" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{m.score_display || `${m.score_a ?? 0} : ${m.score_b ?? 0}`}</Box>}
+                      </TableCell>
                       <TableCell><Badge color={statusColor(m.status)}>{m.status}</Badge></TableCell>
                     </TableRow>
                   ))}

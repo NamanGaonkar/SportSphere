@@ -28,10 +28,12 @@ type UserRow = {
   full_name: string
   role: string
   contact_info: string | null
+  phone: string | null
   created_at: string
   athletes: { id: string }[] | null
   coaches: { id: string }[] | null
   staff: { id: string }[] | null
+  email?: string | null
 }
 
 const ROLES = ['Admin', 'Coach', 'Athlete', 'HR', 'Finance', 'VenueManager']
@@ -56,12 +58,21 @@ export default function Users() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, role, contact_info, created_at, athletes(id), coaches(id), staff(id)')
-      .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    setRows((data as unknown as UserRow[]) ?? [])
+    const [prof, emails] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, full_name, role, contact_info, phone, created_at, athletes(id), coaches(id), staff(id)')
+        .order('created_at', { ascending: false }),
+      // Auth emails live outside profiles; admin-only RPC surfaces them.
+      supabase.rpc('admin_list_emails'),
+    ])
+    if (prof.error) setError(prof.error.message)
+    const emailMap = new Map<string, string>(
+      ((emails.data as { user_id: string; email: string }[]) ?? []).map((e) => [e.user_id, e.email]),
+    )
+    setRows(
+      ((prof.data as unknown as UserRow[]) ?? []).map((r) => ({ ...r, email: emailMap.get(r.id) ?? null })),
+    )
     setLoading(false)
   }, [])
 
@@ -69,8 +80,14 @@ export default function Users() {
   useRealtimeTable('profiles', load)
 
   const filtered = rows.filter((r) =>
-    !q || [r.full_name, r.role, r.contact_info].some((v) => (v ?? '').toLowerCase().includes(q.toLowerCase())),
+    !q || [r.full_name, r.role, r.contact_info, r.phone, r.email].some((v) => (v ?? '').toLowerCase().includes(q.toLowerCase())),
   )
+
+  async function setPhone(r: UserRow, phone: string) {
+    if (phone === (r.phone ?? '')) return
+    const { error } = await supabase.rpc('admin_set_phone', { p_user: r.id, p_phone: phone })
+    if (error) setError(error.message)
+  }
 
   async function setRole(r: UserRow, role: string) {
     setError('')
@@ -150,8 +167,8 @@ export default function Users() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Name</TableCell>
-                    <TableCell>Contact</TableCell>
-                    <TableCell>Linked record</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Phone</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell>Joined</TableCell>
                   </TableRow>
@@ -173,18 +190,18 @@ export default function Users() {
                             sx={{ '& input': { fontWeight: 600, py: 0.5 } }}
                           />
                         </TableCell>
-                        <TableCell sx={{ width: 200 }}>
+                        <TableCell sx={{ color: 'text.secondary' }}>
+                          {r.email ?? <span style={{ opacity: 0.4 }}>-</span>}
+                        </TableCell>
+                        <TableCell sx={{ width: 170 }}>
                           <TextField
-                            defaultValue={r.contact_info ?? ''}
-                            onBlur={(e) => setContact(r, e.target.value)}
+                            defaultValue={r.phone ?? r.contact_info ?? ''}
+                            onBlur={(e) => setPhone(r, e.target.value)}
                             variant="standard"
                             placeholder="-"
                             fullWidth
                             sx={{ '& input': { py: 0.5 } }}
                           />
-                        </TableCell>
-                        <TableCell sx={{ color: 'text.secondary' }}>
-                          {r.athletes?.length ? 'Athlete record' : r.coaches?.length ? 'Coach record' : r.staff?.length ? 'Staff record' : '-'}
                         </TableCell>
                         <TableCell sx={{ width: 210 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75 }}>

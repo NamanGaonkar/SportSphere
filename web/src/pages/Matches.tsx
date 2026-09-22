@@ -15,22 +15,31 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import TablePagination from '@mui/material/TablePagination'
+import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
 import IconButton from '@mui/material/IconButton'
 import AddIcon from '@mui/icons-material/Add'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import SportsScoreIcon from '@mui/icons-material/SportsScore'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable, useSports } from '../lib/hooks'
 import { SportFilter } from '../components/SportSelect'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
+import { scoreKind, kindLabel, scoreFieldsFor, isScoreEmpty, formatScore } from '../lib/score'
+import type { ScoreFields } from '../lib/score'
 
 type Match = {
   id: string
   status: string
   score_a: number | null
   score_b: number | null
+  wickets_a: number | null
+  wickets_b: number | null
+  sets_a: number | null
+  sets_b: number | null
+  score_display: string | null
   result: string | null
   scheduled_at: string | null
   tournament_id: string | null
@@ -124,17 +133,32 @@ export default function Matches() {
     load()
   }
 
-  async function updateScore(m: Match, side: 'a' | 'b', value: string) {
-    const patch = side === 'a' ? { score_a: Number(value) } : { score_b: Number(value) }
-    await supabase.from('matches').update(patch).eq('id', m.id)
+  // Scores are entered through the Edit dialog with sport-correct fields
+  // (cricket: runs/wickets, volleyball: sets+points, races: time/position).
+  // The database composes result + score_display for the selected sport.
+  const [scoreFor, setScoreFor] = useState<Match | null>(null)
+  const [scoreForm, setScoreForm] = useState<ScoreFields>({
+    score_a: null, score_b: null, wickets_a: null, wickets_b: null, sets_a: null, sets_b: null,
+  })
+  const [scoreStatus, setScoreStatus] = useState('Completed')
+  const [scoreError, setScoreError] = useState('')
+
+  async function saveScore(e: React.FormEvent) {
+    e.preventDefault()
+    if (!scoreFor) return
+    setScoreError('')
+    const { error } = await supabase
+      .from('matches')
+      .update({ ...scoreForm, status: scoreStatus })
+      .eq('id', scoreFor.id)
+    if (error) { setScoreError(error.message); return }
+    setScoreFor(null)
     load()
   }
 
   async function setStatus(m: Match, status: string) {
+    // Result/score_display are composed by database triggers per sport.
     const patch: Record<string, unknown> = { status }
-    if (status === 'Completed') {
-      patch.result = `${m.team_a?.name ?? 'A'} ${m.score_a ?? 0} - ${m.score_b ?? 0} ${m.team_b?.name ?? 'B'}`
-    }
     await supabase.from('matches').update(patch).eq('id', m.id)
     load()
   }
@@ -166,9 +190,11 @@ export default function Matches() {
   }
 
   // Picking a tournament narrows team options to that tournament's sport
-  // (tester round 2 #9); picking a sport filter narrows them too.
+  // (tester round 2 #9); picking a sport filter narrows them too. The
+  // database enforces the same rule (check_match_sport trigger), so
+  // cross-sport pairings are impossible even from other clients.
   const formSportId =
-    (tournaments.find((t) => t.id === form.tournament_id)?.sport_id) || ''
+    (tournaments.find((t) => t.id === form.tournament_id)?.sport_id) || filterS || ''
   const eligibleTeams = useMemo(
     () => teams.filter((t) => !formSportId || t.sport_id === formSportId),
     [teams, formSportId],
@@ -238,19 +264,13 @@ export default function Matches() {
                         <TableCell sx={{ color: 'text.secondary' }}>{m.venues?.name ?? '-'}</TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>{fmt(m.scheduled_at)}</TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                            <TextField
-                              type="number" size="small" sx={{ width: 64 }}
-                              defaultValue={m.score_a ?? 0}
-                              onBlur={(e) => Number(e.target.value) !== (m.score_a ?? 0) && updateScore(m, 'a', e.target.value)}
-                            />
-                            <Box component="span">:</Box>
-                            <TextField
-                              type="number" size="small" sx={{ width: 64 }}
-                              defaultValue={m.score_b ?? 0}
-                              onBlur={(e) => Number(e.target.value) !== (m.score_b ?? 0) && updateScore(m, 'b', e.target.value)}
-                            />
-                          </Box>
+                          {isScoreEmpty(m) ? (
+                            <Typography variant="body2" sx={{ color: 'text.disabled' }}>-</Typography>
+                          ) : (
+                            <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {m.score_display || formatScore(scoreKind(byId(m.team_a?.sport_id)), m)}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -266,6 +286,21 @@ export default function Matches() {
                           </Box>
                         </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setScoreFor(m)
+                              setScoreForm({
+                                score_a: m.score_a, score_b: m.score_b,
+                                wickets_a: m.wickets_a, wickets_b: m.wickets_b,
+                                sets_a: m.sets_a, sets_b: m.sets_b,
+                              })
+                              setScoreStatus(m.status === 'Scheduled' ? 'Completed' : m.status)
+                            }}
+                            aria-label="Record score"
+                          >
+                            <SportsScoreIcon fontSize="small" />
+                          </IconButton>
                           <IconButton size="small" onClick={() => openEdit(m)} aria-label="Edit">
                             <EditOutlinedIcon fontSize="small" />
                           </IconButton>
@@ -345,6 +380,49 @@ export default function Matches() {
           <DialogActions>
             <Button onClick={() => setShowForm(false)} color="inherit">Cancel</Button>
             <Button type="submit" variant="contained">{editing ? 'Save' : 'Add'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Sport-aware score entry: cricket = runs/wickets, volleyball = sets,
+          badminton/TT = games, races = time/position. The DB composes the
+          sport-correct result string and score_display. */}
+      <Dialog open={!!scoreFor} onClose={() => setScoreFor(null)} maxWidth="xs" fullWidth>
+        <form onSubmit={saveScore}>
+          <DialogTitle>Record result</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              {scoreFor?.team_a?.name ?? 'TBD'} vs {scoreFor?.team_b?.name ?? 'TBD'}
+              {scoreFor ? ` - enter ${kindLabel(scoreKind(byId(scoreFor.team_a?.sport_id)))}` : ''}
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
+              {scoreFieldsFor(scoreKind(byId(scoreFor?.team_a?.sport_id))).map((f) => (
+                <TextField
+                  key={f.key}
+                  label={f.label}
+                  type={f.type}
+                  size="small"
+                  value={scoreForm[f.key] ?? ''}
+                  onChange={(e) =>
+                    setScoreForm({
+                      ...scoreForm,
+                      [f.key]: e.target.value === '' ? null : f.type === 'number' ? Number(e.target.value) : e.target.value,
+                    })
+                  }
+                />
+              ))}
+              <TextField
+                select size="small" label="Status" value={scoreStatus}
+                onChange={(e) => setScoreStatus(e.target.value)} sx={{ gridColumn: '1 / -1' }}
+              >
+                {['Completed', 'Scheduled', 'Cancelled'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              </TextField>
+            </Box>
+            {scoreError && <Alert severity="error" sx={{ mt: 2 }}>{scoreError}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setScoreFor(null)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained">Save result</Button>
           </DialogActions>
         </form>
       </Dialog>

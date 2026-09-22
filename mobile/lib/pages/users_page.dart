@@ -58,11 +58,16 @@ class _UsersPageState extends State<UsersPage> {
     try {
       final data = await client
           .from('profiles')
-          .select('id, full_name, role, contact_info, created_at, athletes(id), coaches(id), staff(id)')
+          .select('id, full_name, role, contact_info, phone, created_at, athletes(id), coaches(id), staff(id)')
           .order('created_at', ascending: false);
+      // Auth emails live outside profiles; admin-only RPC surfaces them.
+      final emails = await client.rpc('admin_list_emails');
+      final emailMap = <String, String>{
+        for (final e in (emails as List)) '${e['user_id']}': '${e['email']}',
+      };
       if (!mounted) return;
       setState(() {
-        _rows = (data as List).cast<DbRow>();
+        _rows = (data as List).map<DbRow>((r) => {...(r as DbRow), 'email': emailMap['${r['id']}']}).toList();
         _loading = false;
       });
     } catch (e) {
@@ -75,7 +80,7 @@ class _UsersPageState extends State<UsersPage> {
   List<DbRow> get _filtered {
     if (_q.isEmpty) return _rows;
     return _rows
-        .where((r) => '${r['full_name']} ${r['role']} ${r['contact_info'] ?? ''}'
+        .where((r) => '${r['full_name']} ${r['role']} ${r['contact_info'] ?? ''} ${r['phone'] ?? ''} ${r['email'] ?? ''}'
             .toLowerCase()
             .contains(_q.toLowerCase()))
         .toList();
@@ -116,13 +121,13 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Future<void> _setContact(DbRow r) async {
-    final ctrl = TextEditingController(text: '${r['contact_info'] ?? ''}');
+  Future<void> _setPhone(DbRow r) async {
+    final ctrl = TextEditingController(text: '${r['phone'] ?? r['contact_info'] ?? ''}');
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit contact'),
-        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(labelText: 'Contact (email / phone)')),
+        title: const Text('Edit phone'),
+        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(labelText: 'Phone number')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -131,9 +136,9 @@ class _UsersPageState extends State<UsersPage> {
     );
     if (ok != true) return;
     try {
-      await client.rpc('admin_set_contact', params: {
+      await client.rpc('admin_set_phone', params: {
         'p_user': r['id'],
-        'p_contact': ctrl.text.trim().isEmpty ? null : ctrl.text.trim(),
+        'p_phone': ctrl.text.trim(),
       });
       _load();
     } catch (e) {
@@ -261,7 +266,8 @@ class _UsersPageState extends State<UsersPage> {
                                 ),
                               ),
                               title: Text('${r['full_name']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                              subtitle: Text('${r['contact_info'] ?? '-'}', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              subtitle: Text('${r['email'] ?? '-'} - ${r['phone'] ?? r['contact_info'] ?? 'no phone'}',
+                                  style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                               trailing: SizedBox(
                                 width: 148,
                                 child: DropdownButtonFormField<String>(
@@ -300,11 +306,11 @@ class _UsersPageState extends State<UsersPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.contact_mail_outlined),
-              title: const Text('Edit contact'),
+              leading: const Icon(Icons.phone_outlined),
+              title: const Text('Edit phone'),
               onTap: () {
                 Navigator.pop(ctx);
-                _setContact(r);
+                _setPhone(r);
               },
             ),
             ListTile(
