@@ -20,3 +20,6 @@ build/
 # --- logs / misc ---
 *.log
 .DS_Store
+
+web/tsconfig.tsbuildinfo
+scripts/__pycache__/
