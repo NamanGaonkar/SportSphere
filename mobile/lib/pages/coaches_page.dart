@@ -246,27 +246,27 @@ class _CoachesPageState extends State<CoachesPage> {
               TextField(controller: trainsCtrl, decoration: const InputDecoration(labelText: 'Trains (teams / players note)')),
               const SizedBox(height: 14),
               TextField(controller: expCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Experience (years)')),
-              if (editing != null) ...[
-                const SizedBox(height: 14),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Teams assigned', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    for (final t in allTeams)
-                      FilterChip(
-                        label: Text('${t['name']}', style: const TextStyle(fontSize: 12)),
-                        selected: selectedTeams.contains('${t['id']}'),
-                        onSelected: (on) => setModal(() =>
-                            on ? selectedTeams.add('${t['id']}') : selectedTeams.remove('${t['id']}')),
-                      ),
-                  ],
-                ),
-              ],
+              const SizedBox(height: 14),
+              // Teams assigned in BOTH add and edit — the forms used to
+              // diverge (chips missing on add).
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Teams assigned', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final t in allTeams)
+                    FilterChip(
+                      label: Text('${t['name']}', style: const TextStyle(fontSize: 12)),
+                      selected: selectedTeams.contains('${t['id']}'),
+                      onSelected: (on) => setModal(() =>
+                          on ? selectedTeams.add('${t['id']}') : selectedTeams.remove('${t['id']}')),
+                    ),
+                ],
+              ),
               const SizedBox(height: 20),
               Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
@@ -308,7 +308,18 @@ class _CoachesPageState extends State<CoachesPage> {
         });
       } else {
         final profile = await client.from('profiles').insert({'full_name': name, 'role': 'Coach'}).select('id').single();
-        await client.from('coaches').insert({'profile_id': profile['id'], ...payload});
+        final created = await client
+            .from('coaches')
+            .insert({'profile_id': profile['id'], ...payload})
+            .select('id')
+            .single();
+        // Team assignments right after create — same RPC as edit.
+        if (selectedTeams.isNotEmpty) {
+          await client.rpc('admin_assign_coach_teams', params: {
+            'p_coach': created['id'],
+            'p_teams': selectedTeams.toList(),
+          });
+        }
       }
       _load();
     } catch (e) {

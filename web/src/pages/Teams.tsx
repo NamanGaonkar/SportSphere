@@ -24,6 +24,9 @@ import AddIcon from '@mui/icons-material/Add'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import SearchIcon from '@mui/icons-material/Search'
+import Avatar from '@mui/material/Avatar'
+import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
 import { useRole } from '../lib/permissions'
@@ -31,19 +34,61 @@ import { SportSelect, SportFilter } from '../components/SportSelect'
 import { PageHead, EmptyState, LoadingState } from '../components/ui'
 import dataTableSx from '../components/tableSx'
 
+/** Image upload bound to the `documents` bucket — a real file picker,
+ *  not a text field. value/onChange carry the public URL. */
+function LogoField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  async function pick(file: File | null) {
+    if (!file) return
+    setBusy(true)
+    try {
+      const path = `team_logos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+      const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('documents').getPublicUrl(path)
+      onChange(data.publicUrl)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {value ? (
+        <Avatar src={value} sx={{ width: 56, height: 56, bgcolor: 'rgba(255,106,19,0.15)' }} variant="rounded" />
+      ) : (
+        <Avatar sx={{ width: 56, height: 56, bgcolor: 'rgba(255,106,19,0.15)' }} variant="rounded">
+          <AddPhotoAlternateOutlinedIcon />
+        </Avatar>
+      )}
+      <Box>
+        <Button variant="outlined" component="label" size="small" disabled={busy} startIcon={<UploadFileIcon />} sx={{ textTransform: 'none' }}>
+          {busy ? 'Uploading…' : value ? 'Replace logo' : 'Upload logo (PNG/JPG)'}
+          <input type="file" hidden accept="image/png,image/jpeg,image/webp" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+        </Button>
+        {value && (
+          <Button size="small" color="inherit" sx={{ display: 'block', textTransform: 'none' }} onClick={() => onChange('')}>
+            Remove
+          </Button>
+        )}
+      </Box>
+    </Box>
+  )
+}
+
 type Team = {
   id: string
   name: string
   sport_id: string | null
   coach_id: string | null
+  logo_url: string | null
   sports: { name: string } | null
   coaches: { profile: { full_name: string } | null } | null
   athletes: { count: number }[] | null
   athlete_profiles?: { profile: { full_name: string } | null }[] | null
 }
 
-type TeamForm = { name: string; sport_id: string; coach_id: string; athleteList?: { id: string; name: string }[] }
-const empty: TeamForm = { name: '', sport_id: '', coach_id: '' }
+type TeamForm = { name: string; sport_id: string; coach_id: string; logo_url: string; athleteList?: { id: string; name: string }[] }
+const empty: TeamForm = { name: '', sport_id: '', coach_id: '', logo_url: '' }
 
 export default function Teams() {
   const [rows, setRows] = useState<Team[]>([])
@@ -70,7 +115,6 @@ export default function Teams() {
     setCoaches((co.data as unknown as { id: string; profile: { full_name: string } | null }[]) ?? [])
     setLoading(false)
   }, [])
-
   useEffect(() => { load() }, [load])
   useRealtimeTable('teams', load)
 
@@ -91,6 +135,7 @@ export default function Teams() {
       name: form.name,
       sport_id: form.sport_id || null,
       coach_id: form.coach_id || null,
+      logo_url: form.logo_url || null,
     }
     const { error } = editing
       ? await supabase.from('teams').update(payload).eq('id', editing)
@@ -114,6 +159,7 @@ export default function Teams() {
       name: t.name,
       sport_id: t.sport_id ?? '',
       coach_id: t.coach_id ?? '',
+      logo_url: t.logo_url ?? '',
       // Roster read-only inside the edit dialog (tester: see who is in the team).
       athleteList: (t.athlete_profiles ?? []).map((p) => ({
         id: p.profile?.full_name ?? '?',
@@ -178,7 +224,19 @@ export default function Teams() {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((t) => (
                       <TableRow key={t.id} hover>
-                        <TableCell>{t.name}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                            {/* Team badge with fallback to the initial. */}
+                            <Avatar
+                              src={t.logo_url ?? undefined}
+                              variant="rounded"
+                              sx={{ width: 30, height: 30, fontSize: 13, bgcolor: 'rgba(255,106,19,0.18)', color: '#B25A1F', fontWeight: 700, borderRadius: 1 }}
+                            >
+                              {t.name.slice(0, 1).toUpperCase()}
+                            </Avatar>
+                            {t.name}
+                          </Box>
+                        </TableCell>
                         <TableCell>{t.sports?.name ?? '-'}</TableCell>
                         <TableCell>{t.coaches?.profile?.full_name ?? '-'}</TableCell>
                         <TableCell>
@@ -231,6 +289,10 @@ export default function Teams() {
                   <MenuItem key={c.id} value={c.id}>{c.profile?.full_name ?? 'Coach'}</MenuItem>
                 ))}
               </TextField>
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                {/* Real image upload — replaces the old plain text field. */}
+                <LogoField value={form.logo_url} onChange={(url) => setForm({ ...form, logo_url: url })} />
+              </Box>
             </Box>
             {editing && (form.athleteList?.length ?? 0) > 0 && (
               <Box sx={{ mt: 2 }}>

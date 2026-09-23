@@ -134,6 +134,22 @@ export default function Coaches() {
         ...coachPayload(form),
       })
       if (error) { setError(error.message); return }
+      // Team assignments right after create — same RPC as edit, so Add and
+      // Edit forms are field-for-field identical.
+      if (form.teams.length) {
+        const { data: newId } = await supabase
+          .from('coaches')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .single()
+        if (newId) {
+          const { error: tErr } = await supabase.rpc('admin_assign_coach_teams', {
+            p_coach: newId.id,
+            p_teams: form.teams,
+          })
+          if (tErr) { setError(tErr.message); return }
+        }
+      }
     }
 
     setShowForm(false)
@@ -300,22 +316,22 @@ export default function Coaches() {
                 fullWidth
                 sx={{ gridColumn: '1 / -1' }}
               />
-              {editing && (
-                <TextField
-                  select
-                  label="Teams assigned"
-                  value={form.teams}
-                  onChange={(e) => setForm({ ...form, teams: typeof e.target.value === 'string' ? [e.target.value] : e.target.value })}
-                  slotProps={{
-                    select: { multiple: true },
-                    inputLabel: { shrink: true },
-                  }}
-                  fullWidth
-                  sx={{ gridColumn: '1 / -1' }}
-                >
-                  {allTeams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-                </TextField>
-              )}
+              {/* Teams assigned in BOTH add and edit — the forms used to
+                  diverge (dropdown missing on add). */}
+              <TextField
+                select
+                label="Teams assigned"
+                value={form.teams}
+                onChange={(e) => setForm({ ...form, teams: typeof e.target.value === 'string' ? [e.target.value] : e.target.value })}
+                slotProps={{
+                  select: { multiple: true },
+                  inputLabel: { shrink: true },
+                }}
+                fullWidth
+                sx={{ gridColumn: '1 / -1' }}
+              >
+                {allTeams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </TextField>
             </Box>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           </DialogContent>

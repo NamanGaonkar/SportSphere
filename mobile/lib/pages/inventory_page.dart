@@ -333,9 +333,18 @@ Future<void> _move(DbRow item) async {
 
   Future<void> _edit(DbRow r) => _itemForm(r);
 
+  static const _categories = [
+    'Balls', 'Bats & Rackets', 'Kits & Jerseys', 'Protective Gear', 'Footwear',
+    'Training Equipment', 'Goal Posts & Nets', 'Fitness & Gym', 'First Aid',
+    'Stationery & Awards', 'Consumables', 'Equipment', 'Other…',
+  ];
+
   Future<void> _itemForm(DbRow? editing) async {
     final nameCtrl = TextEditingController(text: '${editing?['name'] ?? ''}');
     final catCtrl = TextEditingController(text: '${editing?['category'] ?? ''}');
+    // Dropdown state: a known category, or 'Other…' (with the raw value
+    // kept in catCtrl for anything outside the list).
+    String catSelection = _categories.contains(catCtrl.text) ? catCtrl.text : (catCtrl.text.isEmpty ? '' : 'Other…');
     final qtyCtrl = TextEditingController(text: '${editing?['quantity'] ?? ''}');
     final minCtrl = TextEditingController(text: '${editing?['min_stock'] ?? ''}');
     final costCtrl = TextEditingController(text: '${editing?['unit_cost'] ?? ''}');
@@ -352,7 +361,28 @@ Future<void> _move(DbRow item) async {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
               const SizedBox(height: 10),
-              TextField(controller: catCtrl, decoration: const InputDecoration(labelText: 'Category')),
+              DropdownButtonFormField<String>(
+                initialValue: catSelection.isEmpty ? null : catSelection,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('Select category')),
+                  for (final c in _categories) DropdownMenuItem(value: c, child: Text(c)),
+                ],
+                onChanged: (v) => setD(() {
+                  catSelection = v ?? '';
+                  if (v != null && v != 'Other…') catCtrl.text = v;
+                  if (v == 'Other…' && _categories.contains(catCtrl.text)) catCtrl.text = '';
+                }),
+              ),
+              if (catSelection == 'Other…')
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: TextField(
+                    controller: catCtrl,
+                    decoration: const InputDecoration(labelText: 'Custom category'),
+                  ),
+                ),
               const SizedBox(height: 10),
               if (editing == null)
                 TextField(
@@ -407,7 +437,10 @@ Future<void> _move(DbRow item) async {
 
     final payload = <String, dynamic>{
       'name': nameCtrl.text.trim(),
-      'category': catCtrl.text.trim().isEmpty ? null : catCtrl.text.trim(),
+      'category': (catSelection == 'Other…' ? catCtrl.text.trim() : catSelection)
+          .isEmpty
+          ? null
+          : (catSelection == 'Other…' ? catCtrl.text.trim() : catSelection),
       'condition': condition,
       'location': locCtrl.text.trim().isEmpty ? null : locCtrl.text.trim(),
       'unit': unitCtrl.text.trim().isEmpty ? 'pcs' : unitCtrl.text.trim(),

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -136,6 +139,7 @@ class _TeamsPageState extends State<TeamsPage> {
     String name = '${editing?['name'] ?? ''}';
     String sportId = '${editing?['sport_id'] ?? ''}';
     String coachId = '${editing?['coach_id'] ?? ''}';
+    String? logoUrl = editing?['logo_url']?.toString();
     final nameCtrl = TextEditingController(text: name);
     final sports = SportsCache.instance.rows;
     final ok = await showModalBottomSheet<bool>(
@@ -146,6 +150,8 @@ class _TeamsPageState extends State<TeamsPage> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
+          // StatefulBuilder was moved one level up so the logo state updates
+          // re-render the preview inside the same sheet.
           child: StatefulBuilder(
             builder: (ctx, setM) => Column(
               mainAxisSize: MainAxisSize.min,
@@ -154,6 +160,38 @@ class _TeamsPageState extends State<TeamsPage> {
                 Text(editing == null ? 'Add Team' : 'Edit Team',
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 16),
+                // Team badge: real photo upload (documents bucket), with a
+                // preview — replaces the old plain text field.
+                Row(children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundImage: (logoUrl?.isNotEmpty ?? false) ? NetworkImage(logoUrl!) : null,
+                    backgroundColor: const Color(0x2EFF6A13),
+                    child: (logoUrl?.isNotEmpty ?? false)
+                        ? null
+                        : const Icon(Icons.shield_outlined, size: 26, color: Color(0xFFB25A1F)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                      label: Text(
+                          (logoUrl?.isNotEmpty ?? false) ? 'Replace logo' : 'Upload team logo (PNG/JPG)',
+                          overflow: TextOverflow.ellipsis),
+                      onPressed: () async {
+                        final picked = await _pickLogo();
+                        if (picked != null) setM(() => logoUrl = picked);
+                      },
+                    ),
+                  ),
+                  if (logoUrl?.isNotEmpty ?? false)
+                    IconButton(
+                      tooltip: 'Remove logo',
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFC62828)),
+                      onPressed: () => setM(() => logoUrl = null),
+                    ),
+                ]),
+                const SizedBox(height: 14),
                 TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
@@ -208,10 +246,14 @@ class _TeamsPageState extends State<TeamsPage> {
         'sport_id': sportId.isEmpty ? null : sportId,
         'coach_id': coachId.isEmpty ? null : coachId,
       };
+      final fullPayload = {
+        ...payload,
+        'logo_url': (logoUrl?.isNotEmpty ?? false) ? logoUrl : null,
+      };
       if (editing != null) {
-        await client.from('teams').update(payload).eq('id', editing['id']);
+        await client.from('teams').update(fullPayload).eq('id', editing['id']);
       } else {
-        await client.from('teams').insert(payload);
+        await client.from('teams').insert(fullPayload);
       }
       _load();
     } catch (e) {
@@ -223,5 +265,31 @@ class _TeamsPageState extends State<TeamsPage> {
     if (!await confirmDelete(context, 'team? Athletes will be unlinked')) return;
     await client.from('teams').delete().eq('id', t['id']);
     _load();
+  }
+
+  /// Upload a team logo (PNG/JPG) to the documents bucket; returns the URL.
+  Future<String?> _pickLogo() async {
+    try {
+      final result = await ImagePickerHelper.pickImage();
+      final file = result;
+      if (file == null) return null;
+      final path = 'team_logos/${DateTime.now().millisecondsSinceEpoch}_team_logo.png';
+      await client.storage.from('documents').upload(path, file);
+      return client.storage.from('documents').getPublicUrl(path);
+    } catch (_) {
+      if (mounted) showSnack(context, 'Upload failed', error: true);
+      return null;
+    }
+  }
+}
+
+/// Small helper wrapping image_picker (kept separate so the page stays
+/// readable); falls back to file_picker if image_picker is unavailable.
+class ImagePickerHelper {
+  static Future<File?> pickImage() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final f = result?.files.single;
+    if (f?.path == null) return null;
+    return File(f!.path!);
   }
 }

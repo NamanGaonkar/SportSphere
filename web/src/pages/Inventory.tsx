@@ -58,6 +58,10 @@ type Tx = {
 }
 
 const CONDITIONS = ['New', 'Good', 'Worn', 'Damaged', 'Under maintenance']
+// Canonical categories — dropdown instead of free text (tester round 4).
+// "Other…" reveals a text field for anything outside the list.
+const CATEGORIES = ['Balls', 'Bats & Rackets', 'Kits & Jerseys', 'Protective Gear', 'Footwear', 'Training Equipment', 'Goal Posts & Nets', 'Fitness & Gym', 'First Aid', 'Stationery & Awards', 'Consumables', 'Equipment']
+const OTHER_CATEGORY = 'Other…'
 
 /** Detailed equipment management: full item fields + a stock transaction log. */
 export default function Inventory() {
@@ -386,7 +390,25 @@ export default function Inventory() {
           <DialogContent dividers>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, pt: 0.5 }}>
               <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth />
-              <TextField label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} fullWidth />
+              <TextField
+                select
+                label="Category"
+                value={CATEGORIES.includes(form.category) || form.category === '' ? form.category : OTHER_CATEGORY}
+                onChange={(e) => setForm({ ...form, category: e.target.value === OTHER_CATEGORY ? 'Other' : e.target.value })}
+                fullWidth
+              >
+                {CATEGORIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                <MenuItem value={OTHER_CATEGORY}>{OTHER_CATEGORY}</MenuItem>
+              </TextField>
+              {(form.category === 'Other' || !CATEGORIES.includes(form.category)) && form.category !== '' && (
+                <TextField
+                  label="Custom category"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  fullWidth
+                  sx={{ gridColumn: '1 / -1' }}
+                />
+              )}
               <TextField type="number" label="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} fullWidth disabled={Boolean(editing)} helperText={editing ? 'Use stock movements to change quantity' : 'Opening stock is logged automatically'} />
               <TextField select label="Condition" value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })} fullWidth>
                 {CONDITIONS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}

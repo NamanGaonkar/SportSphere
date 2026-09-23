@@ -25,3 +25,4 @@ web/tsconfig.tsbuildinfo
 scripts/__pycache__/
 
 changes.txt
+mobile/env.json
