@@ -187,11 +187,11 @@ export default function Dashboard() {
           gap: 2,
         }}
       >
-        <Section title="Recent Matches">
+        <Section title="Recent Matches" sx={{ height: { md: 380 }, boxSizing: 'border-box' }}>
           {matches.length === 0 ? (
             <EmptyState text="No matches scheduled yet." />
           ) : (
-            <TableContainer>
+            <TableContainer sx={{ maxHeight: { md: 270 }, overflowY: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -220,7 +220,7 @@ export default function Dashboard() {
           )}
         </Section>
 
-        <Section title="Teams by Sport">
+        <Section title="Teams by Sport" sx={{ height: { md: 380 }, boxSizing: 'border-box' }}>
           {teamsBySport.length === 0 ? (
             <EmptyState text="No teams yet." />
           ) : (
@@ -228,7 +228,7 @@ export default function Dashboard() {
                The label and the bar live in the SAME element, so axis naming
                and hover can never drift out of alignment (Recharts' vertical
                band axis kept misaligning ticks vs cursor). */
-            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', maxHeight: { md: 290 }, overflowY: 'auto', pr: 0.5 }}>
               {teamsBySport.map((s) => {
                 const max = Math.max(...teamsBySport.map((x) => x.teams), 1)
                 const pct = Math.max((s.teams / max) * 100, 6) // min 6% so a lone team is still visible
@@ -244,7 +244,7 @@ export default function Dashboard() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
-                        py: 1,
+                        py: 0.5,
                         px: 1,
                         borderRadius: 1.5,
                         transition: 'background-color .15s',
@@ -267,7 +267,7 @@ export default function Dashboard() {
                         {s.name}
                       </Typography>
                       {/* Bar track — fills the rest of the card width */}
-                      <Box sx={{ flex: 1, height: 22, borderRadius: 1, bgcolor: 'rgba(13,13,13,0.05)', overflow: 'hidden' }}>
+                      <Box sx={{ flex: 1, height: 18, borderRadius: 1, bgcolor: 'rgba(13,13,13,0.05)', overflow: 'hidden' }}>
                         <Box
                           sx={{
                             width: `${pct}%`,
