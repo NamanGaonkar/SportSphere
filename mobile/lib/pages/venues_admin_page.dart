@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../main.dart' show Brand;
 import '../widgets/common.dart';
 import 'crud_page.dart' show DbRow;
 
@@ -350,11 +351,40 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
                                 BadgeChip('${v['status'] ?? '-'}',
                                     color: statusColor('${v['status'] ?? ''}')),
                               ]),
-                              const SizedBox(height: 4),
-                              Text('${v['location'] ?? '-'}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
+                              const SizedBox(height: 6),
+                              // Address in a padded highlight box so it
+                              // stands out (web parity).
+                              if ('${v['location'] ?? ''}'.isNotEmpty)
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Brand.primary.withValues(alpha: 0.07),
+                                    border: Border.all(color: Brand.primary.withValues(alpha: 0.22)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.place_outlined, size: 15, color: Brand.primary),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          '${v['location']}',
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              height: 1.35,
+                                              color: Theme.of(context).colorScheme.onSurface
+                                                  .withValues(alpha: 0.75)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Text('-', style: TextStyle(fontSize: 12.5, color: subT(context))),
                               const SizedBox(height: 8),
                               Text(
                                 'Capacity: ${v['capacity'] ?? '-'} - Bookings: ${((v['venue_bookings'] as List?) ?? const []).isNotEmpty ? (v['venue_bookings'] as List)[0]['count'] : 0}',

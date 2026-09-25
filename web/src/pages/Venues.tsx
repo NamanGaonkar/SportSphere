@@ -19,6 +19,7 @@ import { useSports } from '../lib/hooks'
 import { useRole } from '../lib/permissions'
 import { PageHead, Badge, statusColor, EmptyState, LoadingState } from '../components/ui'
 import LocationPicker from '../components/LocationPicker'
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined'
 import Chip from '@mui/material/Chip'
 
 export type Venue = {
@@ -157,7 +158,28 @@ export default function Venues() {
                 <Typography variant="h6">{v.name}</Typography>
                 <Badge color={statusColor(v.status)}>{v.status}</Badge>
               </Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{v.location ?? '-'}</Typography>
+              {/* Address in a padded highlight box so it stands out. */}
+              {v.location ? (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 0.75,
+                    bgcolor: 'rgba(255, 106, 19, 0.06)',
+                    border: '1px solid rgba(255, 106, 19, 0.18)',
+                    borderRadius: 1.5,
+                    px: 1.25,
+                    py: 1,
+                  }}
+                >
+                  <PlaceOutlinedIcon sx={{ fontSize: 16, color: 'primary.main', mt: '1px' }} />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.45 }}>
+                    {v.location}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>-</Typography>
+              )}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Typography variant="body2"><b>Capacity</b> {v.capacity?.toLocaleString() ?? '-'}</Typography>
                 <Typography variant="body2"><b>Match</b> {v.booking_price_match != null ? `Rs ${Number(v.booking_price_match).toLocaleString('en-IN')}` : '-'}</Typography>

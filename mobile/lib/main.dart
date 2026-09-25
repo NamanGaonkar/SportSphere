@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/sports.dart';
@@ -83,6 +84,42 @@ class Brand {
   static const primaryHover = Color(0xFFFF8A42); // accent / hover orange
   static const black = Color(0xFF0D0D0D);
   static const background = Color(0xFFFAFAF8);
+
+  // Dark-mode app palette (app only — the web app stays light).
+  static const darkBg = Color(0xFF0D0D0D); // scaffold background
+  static const darkSurface = Color(0xFF161616); // cards / tables
+  static const darkSurfaceAlt = Color(0xFF1F1F1F); // table header, wells
+  static const darkBorder = Color(0xFF2A2A2A); // hairlines / input borders
+}
+
+/// App-only theme mode (web app is untouched). Persisted so the choice
+/// survives restarts. Listened to by the root MaterialApp.
+class ThemeController extends ChangeNotifier {
+  ThemeController._();
+  static final ThemeController instance = ThemeController._();
+
+  static const _kPrefKey = 'sportsphere.dark';
+  bool _dark = false;
+  bool get isDark => _dark;
+
+  Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _dark = prefs.getBool(_kPrefKey) ?? false;
+    } catch (_) {
+      _dark = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggle() async {
+    _dark = !_dark;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kPrefKey, _dark);
+    } catch (_) {}
+  }
 }
 
 Future<void> main() async {
@@ -96,40 +133,77 @@ Future<void> main() async {
   }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseAnonKey);
   await initShellPrefs();
+  await ThemeController.instance.load();
   // Start the sports lookup early so dashboard charts have names on first paint.
   SportsCache.warm();
   runApp(const SportSphereApp());
 }
 
-class SportSphereApp extends StatelessWidget {
+class SportSphereApp extends StatefulWidget {
   const SportSphereApp({super.key});
 
   @override
+  State<SportSphereApp> createState() => _SportSphereAppState();
+}
+
+class _SportSphereAppState extends State<SportSphereApp> {
+  @override
+  void initState() {
+    super.initState();
+    ThemeController.instance.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeController.instance.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dark = ThemeController.instance.isDark;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark.copyWith(
+      // Dark status-bar icons on the light theme, white icons on dark.
+      value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
         statusBarColor: Colors.transparent,
         systemNavigationBarColor: Colors.transparent,
       ),
       child: MaterialApp(
-      title: 'SportSphere',
-      debugShowCheckedModeBanner: false,
-      theme: _buildTheme(),
-      home: const SplashPage(),
+        title: 'SportSphere',
+        debugShowCheckedModeBanner: false,
+        theme: _buildTheme(Brightness.light),
+        darkTheme: _buildTheme(Brightness.dark),
+        themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+        home: const SplashPage(),
       ),
     );
   }
 
-  ThemeData _buildTheme() {
-    const scheme = ColorScheme.light(
-      primary: Brand.primary,
-      onPrimary: Colors.white,
-      secondary: Brand.primaryHover,
-      onSecondary: Colors.white,
-      surface: Colors.white,
-      onSurface: Brand.black,
-      error: Color(0xFFC62828),
-    );
+  ThemeData _buildTheme(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    final scheme = dark
+        ? const ColorScheme.dark(
+            primary: Brand.primary,
+            onPrimary: Colors.white,
+            secondary: Brand.primaryHover,
+            onSecondary: Colors.white,
+            surface: Brand.darkSurface,
+            onSurface: Colors.white,
+            error: Color(0xFFEF5350),
+          )
+        : const ColorScheme.light(
+            primary: Brand.primary,
+            onPrimary: Colors.white,
+            secondary: Brand.primaryHover,
+            onSecondary: Colors.white,
+            surface: Colors.white,
+            onSurface: Brand.black,
+            error: Color(0xFFC62828),
+          );
 
     final base = ThemeData(
       useMaterial3: true,
@@ -138,44 +212,51 @@ class SportSphereApp extends StatelessWidget {
       fontFamily: 'Lato',
     );
 
+    final fg = scheme.onSurface;
+    final sub = dark ? Colors.white60 : Colors.black54;
+    final borderColor = dark ? Brand.darkBorder : const Color(0xFFE5E5E0);
+    final fillColor = dark ? Brand.darkSurfaceAlt : Colors.white;
+
     return base.copyWith(
       textTheme: base.textTheme.apply(
-        bodyColor: Brand.black,
-        displayColor: Brand.black,
+        bodyColor: fg,
+        displayColor: fg,
       ),
       // FilterChip labels must stay readable in BOTH states: dark ink on
       // light backgrounds when unselected, dark ink on the orange tint when
       // selected (white labels were invisible on the pale chip fill).
       chipTheme: base.chipTheme.copyWith(
-        labelStyle: const TextStyle(color: Brand.black, fontSize: 12.5, fontWeight: FontWeight.w600),
-        secondaryLabelStyle: const TextStyle(color: Brand.black, fontSize: 12.5, fontWeight: FontWeight.w600),
+        labelStyle: TextStyle(color: fg, fontSize: 12.5, fontWeight: FontWeight.w600),
+        secondaryLabelStyle: TextStyle(color: fg, fontSize: 12.5, fontWeight: FontWeight.w600),
         selectedColor: const Color(0x33FF6A13),
-        backgroundColor: const Color(0xFFF3F3EE),
+        backgroundColor: dark ? Brand.darkSurfaceAlt : const Color(0xFFF3F3EE),
         checkmarkColor: const Color(0xFFB24A00),
-        side: const BorderSide(color: Color(0xFFDDDDD2)),
+        side: BorderSide(color: dark ? Brand.darkBorder : const Color(0xFFDDDDD2)),
         showCheckmark: true,
       ),
-      scaffoldBackgroundColor: Brand.background,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Brand.background,
-        foregroundColor: Brand.black,
+      scaffoldBackgroundColor: dark ? Brand.darkBg : Brand.background,
+      appBarTheme: AppBarTheme(
+        backgroundColor: dark ? Brand.darkBg : Brand.background,
+        foregroundColor: fg,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Brand.black),
+        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: fg),
       ),
-      dropdownMenuTheme: const DropdownMenuThemeData(
-        textStyle: TextStyle(color: Brand.black, fontSize: 15),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: TextStyle(color: fg, fontSize: 15),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: fillColor,
+        hintStyle: TextStyle(color: sub),
+        labelStyle: TextStyle(color: sub),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFE5E5E0)),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFE5E5E0)),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -200,25 +281,30 @@ class SportSphereApp extends StatelessWidget {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: dark ? Brand.darkSurface : Colors.white,
         indicatorColor: Brand.primary.withValues(alpha: 0.12),
-        iconTheme: const WidgetStatePropertyAll(IconThemeData(color: Brand.black)),
-        labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.black),
+        iconTheme: WidgetStatePropertyAll(IconThemeData(color: fg)),
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg),
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: dark ? Brand.darkSurface : Colors.white,
         elevation: 0,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFFE5E5E0)),
+          side: BorderSide(color: dark ? Brand.darkBorder : const Color(0xFFE5E5E0)),
         ),
       ),
-      dividerTheme: const DividerThemeData(color: Color(0xFFE5E5E0), thickness: 1),
+      dialogTheme: DialogThemeData(
+        backgroundColor: dark ? Brand.darkSurface : Colors.white,
+        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: fg),
+        contentTextStyle: TextStyle(fontSize: 14, color: fg),
+      ),
+      dividerTheme: DividerThemeData(color: dark ? Brand.darkBorder : const Color(0xFFE5E5E0), thickness: 1),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: Brand.black,
+        backgroundColor: dark ? Brand.darkSurfaceAlt : Brand.black,
         contentTextStyle: const TextStyle(color: Colors.white),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

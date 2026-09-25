@@ -4,9 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/scoring.dart';
 import '../data/sports.dart';
-import '../main.dart' show Brand;
+import '../main.dart' show Brand, ThemeController;
 import '../widgets/common.dart';
+import 'athlete_flow_page.dart';
 import 'athletes_page.dart';
+import 'coach_flow_page.dart';
 import 'attendance_admin_page.dart';
 import 'coaches_page.dart';
 import 'crud_page.dart';
@@ -41,6 +43,10 @@ class _NavSection {
 
 const _navSections = <_NavSection>[
   _NavSection('Overview', [
+    // Role-scoped homes: athletes and coaches get their own flow screens
+    // (same DB, filtered to what they own). Hidden for every other role.
+    _NavItem('My Sport', Icons.sports_soccer_outlined, _athleteFlow, roles: ['Athlete']),
+    _NavItem('Coach Desk', Icons.assignment_outlined, _coachFlow, roles: ['Coach']),
     _NavItem('Dashboard', Icons.dashboard_outlined, _dashboard, ),
     _NavItem('Reports', Icons.bar_chart_outlined, _reports),
   ]),
@@ -93,6 +99,13 @@ const _navSections = <_NavSection>[
   ]),
 ];
 
+Widget _athleteFlow() => const AthleteFlowPage();
+Widget _coachFlow() => const CoachFlowPage();
+
+/// Muted text color that adapts to the app theme (dark mode flips the
+/// hardcoded black54 grays used across the dashboard).
+Color subText(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark ? Colors.white60 : Colors.black54;
 Widget _dashboard() => const DashboardHome();
 Widget _reports() => const ReportsPage();
 Widget _profilePage() => const ProfilePage();
@@ -151,12 +164,16 @@ class _DrawerNavList extends StatefulWidget {
   final String current;
   final void Function(String label) onSelect;
   final double initialOffset;
+  /// True when the app is in dark mode: the rail is orange and the
+  /// selected item flips to black (light mode: black rail, orange item).
+  final bool dark;
   const _DrawerNavList({
     super.key,
     required this.sections,
     required this.current,
     required this.onSelect,
     required this.initialOffset,
+    required this.dark,
   });
 
   @override
@@ -196,7 +213,7 @@ class _DrawerNavListState extends State<_DrawerNavList> {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
-                    color: Colors.white.withValues(alpha: 0.42))),
+                    color: Colors.white.withValues(alpha: widget.dark ? 0.6 : 0.42))),
           ),
           for (final item in s.items)
             Padding(
@@ -208,22 +225,30 @@ class _DrawerNavListState extends State<_DrawerNavList> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   margin: const EdgeInsets.symmetric(vertical: 1),
                   decoration: BoxDecoration(
-                    color: widget.current == item.label ? Brand.primary : Colors.transparent,
+                    // Dark mode: orange rail with a BLACK selected pill.
+                    // Light mode: black rail with the orange selected pill.
+                    color: widget.current == item.label
+                        ? (widget.dark ? const Color(0xFF141414) : Brand.primary)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
                       Icon(item.icon,
                           size: 20,
-                          color: widget.current == item.label ? Colors.white : Colors.white70),
+                          color: widget.current == item.label
+                              ? (widget.dark ? Brand.primary : Colors.white)
+                              : Colors.white.withValues(alpha: widget.dark ? 0.92 : 0.7)),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(item.label,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.white
-                                    .withValues(alpha: widget.current == item.label ? 1 : 0.72),
+                                color: Colors.white.withValues(
+                                    alpha: widget.current == item.label
+                                        ? 1
+                                        : (widget.dark ? 0.92 : 0.72)),
                                 fontWeight: widget.current == item.label
                                     ? FontWeight.w700
                                     : FontWeight.w400)),
@@ -356,20 +381,27 @@ class _HomeShellState extends State<HomeShell> {
         shape: const RoundedRectangleBorder(),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Brand.black,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 40,
-                    offset: const Offset(0, 12),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),              child: Builder(builder: (context) {
+                // Dark mode: the rail flips to brand orange and the selected
+                // item becomes black (light mode keeps the black rail).
+                final dark = ThemeController.instance.isDark;
+                final railColor = dark ? Brand.primary : Brand.black;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: railColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: dark
+                            ? Colors.black.withValues(alpha: 0.25)
+                            : Colors.white.withValues(alpha: 0.08)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: 40,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                ],
-              ),
               child: Column(
                 children: [
                   // Header: logo + app name (fixed drawer, no collapse toggle).
@@ -410,6 +442,7 @@ class _HomeShellState extends State<HomeShell> {
                           _prefs?.setString(_kPrefKey, label);
                           Navigator.pop(context);
                         },
+                        dark: ThemeController.instance.isDark,
                       ),
                     ),
                   ),
@@ -447,12 +480,32 @@ class _HomeShellState extends State<HomeShell> {
                             child: const Icon(Icons.logout, color: Colors.white70, size: 19),
                           ),
                         ),
+                        const SizedBox(width: 10),
+                        // Dark-mode toggle — APP ONLY (the web app stays light).
+                        InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => setState(() => ThemeController.instance.toggle()),
+                          child: Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                            ),
+                            child: Icon(
+                              ThemeController.instance.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                              color: Colors.white70,
+                              size: 19,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),
+            );
+          },
+        ),
           ),
         ),
       ),
@@ -476,12 +529,50 @@ class _HomeShellState extends State<HomeShell> {
       ),
       body: items.isEmpty
           ? const LoadingState()
-          : IndexedStack(
-              index: currentIndex,
-              children: _allPages,
+          : AnimatedSwitcher(
+              // Circle-in transition when the section changes: the page is
+              // clipped in through an expanding circle (web parity).
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, anim) => ClipPath(
+                clipper: _CircleRevealClipper(reveal: anim),
+                child: child,
+              ),
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                alignment: Alignment.topLeft,
+                children: [...previousChildren, ?currentChild],
+              ),
+              child: KeyedSubtree(
+                key: ValueKey(currentLabel),
+                child: IndexedStack(
+                  index: currentIndex,
+                  children: _allPages,
+                ),
+              ),
             ),
     );
   }
+}
+
+/// Clip that opens from the top-left (where the menu button sits) with an
+/// expanding radius driven by the switch animation.
+class _CircleRevealClipper extends CustomClipper<Path> {
+  final Animation<double> reveal;
+  _CircleRevealClipper({required this.reveal});
+
+  @override
+  Path getClip(Size size) {
+    final t = reveal.value;
+    // Diagonal length so the circle always covers the whole screen at t=1.
+    final maxR = (size.width * size.width + size.height * size.height);
+    final r = maxR * Curves.easeOut.transform(t.clamp(0.0, 1.0));
+    return Path()
+      ..addOval(Rect.fromCircle(center: const Offset(56, 48), radius: r));
+  }
+
+  @override
+  bool shouldReclip(_CircleRevealClipper old) => old.reveal.value != reveal.value;
 }
 
 // ------------------------------------------------------------------
@@ -682,7 +773,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         children: [
           if (_name.isNotEmpty) ...[
             Text(_name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-            Text(_role, style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
+            Text(_role, style: TextStyle(fontSize: 12.5, color: subText(context))),
             const SizedBox(height: 14),
           ],
           LayoutBuilder(builder: (context, constraints) {
@@ -750,7 +841,9 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w700,
-                                      color: scoreIsEmpty(m) ? Colors.black26 : Brand.primary,
+                                      color: scoreIsEmpty(m)
+                                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)
+                                          : Brand.primary,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -759,7 +852,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                                       _matchMeta(m),
                                       overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.right,
-                                      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                                      style: TextStyle(fontSize: 11.5, color: subText(context)),
                                     ),
                                   ),
                                 ],
@@ -804,7 +897,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     style: const TextStyle(fontSize: 13)),
                               ),
                               Text('${p['month']}'.split('T').first,
-                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                  style: TextStyle(fontSize: 12, color: subText(context))),
                               const SizedBox(width: 6),
                               Text(inr(_toNum(p['net'])),
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
@@ -873,7 +966,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                                   color: statusColor('${a['level'] ?? ''}')),
                               const SizedBox(width: 8),
                               Text(fmtDate(a['date']?.toString()),
-                                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                  style: TextStyle(fontSize: 12, color: subText(context))),
                             ],
                           ),
                         ),
@@ -898,7 +991,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 13)),
                               ),
-                              Text('${m['type'] ?? '-'}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              Text('${m['type'] ?? '-'}', style: TextStyle(fontSize: 12, color: subText(context))),
                               const SizedBox(width: 8),
                               BadgeChip(
                                 m['cleared'] == true ? 'Cleared' : 'Not cleared',
@@ -918,13 +1011,13 @@ class _DashboardHomeState extends State<DashboardHome> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('$_pendingPO', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Brand.primary)),
-                    const Text('POs awaiting delivery', style: TextStyle(fontSize: 11.5, color: Colors.black54)),
+                    Text('POs awaiting delivery', style: TextStyle(fontSize: 11.5, color: subText(context))),
                   ]),
                 ),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${_equip.length}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                    const Text('Equipment items tracked', style: TextStyle(fontSize: 11.5, color: Colors.black54)),
+                    Text('Equipment items tracked', style: TextStyle(fontSize: 11.5, color: subText(context))),
                   ]),
                 ),
               ],
@@ -970,8 +1063,13 @@ class _Card extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title.toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1, color: Colors.black54)),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white60
+                        : Colors.black54)),
             const SizedBox(height: 12),
             child,
           ],

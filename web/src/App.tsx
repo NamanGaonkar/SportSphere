@@ -35,6 +35,7 @@ import {
   AccountCircle as AccountCircleIcon,
 } from '@mui/icons-material'
 import { supabase, envConfigured } from './lib/supabase'
+import PageTransition from './components/PageTransition'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -422,6 +423,9 @@ export default function App() {
             p: { xs: 2, md: 3 },
           }}
         >
+          {/* Circular reveal: each section grows out of the point the user
+              tapped (sidebar item, dashboard card, etc.). */}
+          <PageTransition locationKey={location.pathname}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/reports" element={<Reports />} />
@@ -452,6 +456,7 @@ export default function App() {
             <Route path="/medical" element={<Medical />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </PageTransition>
         </Box>
       </Box>
     </SessionContext.Provider>

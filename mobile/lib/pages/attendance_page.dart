@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../data/sports.dart';
+import '../widgets/common.dart' show subT;
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -189,8 +190,7 @@ class _AttendancePageState extends State<AttendancePage> {
                   if (_myDays.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text('No attendance recorded yet.',
-                          style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                      child: Text('No attendance recorded yet.', style: TextStyle(color: subT(context))),
                     ),
                   ..._myDays.map((d) {
                     final status = (d['status'] ?? '').toString();

@@ -5,6 +5,16 @@ import 'package:flutter/services.dart';
 
 import '../main.dart' show Brand;
 
+/// Muted text color that adapts to dark mode (replaces hardcoded
+/// Colors.black54 everywhere a secondary label is drawn).
+Color subT(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark ? Colors.white60 : Colors.black54;
+
+/// Faint icon/text color for empty states and placeholders.
+Color faintT(BuildContext context) => Theme.of(context).brightness == Brightness.dark
+    ? Colors.white.withValues(alpha: 0.35)
+    : Colors.black.withValues(alpha: 0.3);
+
 /// Mirrors web/src/components/ui.tsx statusColor().
 Color statusColor(String s) {
   switch (s) {
@@ -155,9 +165,9 @@ class PageHead extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(title,
+                child:          Text(title,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
               ),
               // Action button (e.g. Add) sits beside the title and always
               // stays fully visible, never squeezed off-screen.
@@ -167,7 +177,7 @@ class PageHead extends StatelessWidget {
           if (sub != null)
             Padding(
               padding: const EdgeInsets.only(top: 3),
-              child: Text(sub!, style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
+              child: Text(sub!, style: TextStyle(fontSize: 12.5, color: subT(context))),
             ),
         ],
       ),
@@ -284,9 +294,9 @@ class EmptyState extends StatelessWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inbox_outlined, size: 40, color: Colors.black.withValues(alpha: 0.3)),
+            Icon(Icons.inbox_outlined, size: 40, color: faintT(context)),
             const SizedBox(height: 10),
-            Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+            Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: subT(context))),
           ],
         ),
       ),
@@ -310,8 +320,8 @@ class SectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title.toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1, color: Colors.black54)),
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1, color: subT(context))),
             const SizedBox(height: 12),
             centerChild ? Center(child: child) : child,
           ],
@@ -344,9 +354,9 @@ class ErrorRetry extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       child: Column(
         children: [
-          const Icon(Icons.cloud_off_outlined, size: 40, color: Colors.black38),
+          Icon(Icons.cloud_off_outlined, size: 40, color: faintT(context)),
           const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.black54)),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: subT(context))),
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: onRetry,
@@ -474,10 +484,12 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: DefaultTextStyle(
-                  style: const TextStyle(
-                      fontSize: 11.5,
+                  // Bumped from 11.5 to 13: column headers were too small
+                  // to read on a phone (user report).
+                  style: TextStyle(
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black54,
+                      color: subT(context),
                       letterSpacing: 0.3),
                   child: widget.columns[i].label,
                 ),
@@ -489,15 +501,28 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
             width: widths[i],
             padding: EdgeInsets.symmetric(horizontal: colGap, vertical: 8),
             alignment: Alignment.centerLeft,
-            decoration: const BoxDecoration(
-              border: Border(right: BorderSide(color: Color(0xFFEDEDE5), width: 0.8)),
+            decoration: BoxDecoration(
+              border: Border(
+                  right: BorderSide(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Brand.darkBorder
+                          : const Color(0xFFEDEDE5),
+                      width: 0.8)),
             ),
-            child: child,
+            // Default cell text: bumped to 14.5 — cell names were too small
+            // to read on a phone. Cells that set their own style keep it.
+            child: DefaultTextStyle.merge(
+              style: TextStyle(
+                  fontSize: 14.5, color: Theme.of(context).colorScheme.onSurface),
+              child: child,
+            ),
           );
 
       // ---- Header row ----
       final header = Container(
-        color: const Color(0xFFF5F5F0),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Brand.darkSurfaceAlt
+            : const Color(0xFFF5F5F0),
         child: Row(
           children: [
             if (hasDetail)
@@ -522,11 +547,15 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Material(
-                color: open ? const Color(0xFFFFF4EC) : Colors.transparent,
+                color: open
+                    ? (Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF3A2415)
+                        : const Color(0xFFFFF4EC))
+                    : Colors.transparent,
                 child: InkWell(
                   onTap: hasDetail ? () => _toggle(idx) : null,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 50),
+                    constraints: const BoxConstraints(minHeight: 54),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -551,7 +580,11 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
                   detail: widget.detailBuilder!(item),
                   chips: widget.chipsBuilder?.call(item) ?? const [],
                 ),
-              Container(height: 1, color: const Color(0xFFEDEDE5)),
+              Container(
+                  height: 1,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Brand.darkBorder
+                      : const Color(0xFFEDEDE5)),
             ],
           ),
         );
@@ -581,7 +614,7 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
                 // beside it (no "Rows: 10 10" rendering).
                 Text(
                     '${_page * _perPage + 1}-${(_page + 1) * _perPage > total ? total : (_page + 1) * _perPage} of $total',
-                    style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    style: TextStyle(fontSize: 12, color: subT(context))),
                 const SizedBox(width: 4),
                 DropdownButton<int>(
                   value: _perPage,
@@ -601,7 +634,7 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
                   icon: const Icon(Icons.chevron_left),
                 ),
                 Text('${_page + 1}',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   onPressed: _page < maxPage ? () => setState(() => _page++) : null,
@@ -627,9 +660,11 @@ class _DetailPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF4EC),
-        border: Border(left: BorderSide(color: Brand.primary, width: 3)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF3A2415)
+            : const Color(0xFFFFF4EC),
+        border: const Border(left: BorderSide(color: Brand.primary, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,12 +686,14 @@ class _DetailPanel extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 120,
-                    child: Text(e.key,
-                        style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    child: Text(e.key, style: TextStyle(fontSize: 12, color: subT(context))),
                   ),
                   Expanded(
                     child: Text(e.value.isEmpty ? '-' : e.value,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface)),
                   ),
                 ],
               ),
@@ -789,7 +826,9 @@ class _DonutPieState extends State<DonutPie> {
                       Text('${entries[i].key} (${entries[i].value})',
                           style: TextStyle(
                               fontSize: 11.5,
-                              color: _selected == i ? Brand.primary : Colors.black87,
+                              color: _selected == i
+                                  ? Brand.primary
+                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
                               fontWeight: _selected == i ? FontWeight.w700 : FontWeight.w400)),
                     ],
                   ),
@@ -858,7 +897,11 @@ class HBars extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                     child: Stack(
                       children: [
-                        Container(height: 16, color: const Color(0xFFF0F0EA)),
+                        Container(
+                            height: 16,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Brand.darkSurfaceAlt
+                                : const Color(0xFFF0F0EA)),
                         FractionallySizedBox(
                           widthFactor: max == 0 ? 0 : e.value / max,
                           child: Container(height: 16, color: color),
@@ -942,9 +985,9 @@ class VBars extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: const [
-                Text('100', style: _axisStyle),
-                Text('50', style: _axisStyle),
-                Text('0', style: _axisStyle),
+                _AxisStyle('100'),
+                _AxisStyle('50'),
+                _AxisStyle('0'),
               ],
             ),
           ),
@@ -958,17 +1001,29 @@ class VBars extends StatelessWidget {
                     left: 0,
                     right: 0,
                     top: 0,
-                    child: Container(height: 1, color: const Color(0xFFE4E4DC))),
+                    child: Container(
+                        height: 1,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Brand.darkBorder
+                            : const Color(0xFFE4E4DC))),
                 Positioned(
                     left: 0,
                     right: 0,
                     top: plotH / 2,
-                    child: Container(height: 1, color: const Color(0xFFE4E4DC))),
+                    child: Container(
+                        height: 1,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Brand.darkBorder
+                            : const Color(0xFFE4E4DC))),
                 Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: Container(height: 1, color: const Color(0xFFC9C9C0))),
+                    child: Container(
+                        height: 1,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Brand.darkBorder
+                            : const Color(0xFFC9C9C0))),
                 Positioned.fill(
                   child: slots(
                     (i) => _BarSlot(
@@ -1006,13 +1061,7 @@ class VBars extends StatelessWidget {
                     child: Transform.rotate(
                       angle: -0.7, // ~ -40°, same as the web charts
                       alignment: Alignment.topRight,
-                      child: Text(
-                        points[i].label,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.visible,
-                        style: _axisStyle,
-                      ),
+                      child: _AxisStyle(points[i].label),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -1036,8 +1085,20 @@ class VBars extends StatelessWidget {
   }
 }
 
-const _axisStyle = TextStyle(
-    fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.black54);
+class _AxisStyle extends StatelessWidget {
+  final String text;
+  const _AxisStyle(this.text);
+  @override
+  Widget build(BuildContext context) {
+    return Text(text,
+        style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white60
+                : Colors.black54));
+  }
+}
 
 /// One day's column inside the plot: value label, bar (or dash gap), all
 /// inside a tap tooltip with the exact numbers for that day.
@@ -1074,15 +1135,22 @@ class _BarSlot extends StatelessWidget {
             height: valueSlot,
             child: showValue && p.marked
                 ? Text('${p.pct}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black54))
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white60
+                            : Colors.black54))
                 : null,
           ),
           if (!p.marked)
             // Unmarked day: a small dash, never a bar (never 0%, never 100%).
-            Container(width: bar, height: 2, color: Colors.black12)
+            Container(
+                width: bar,
+                height: 2,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white24
+                    : Colors.black12)
           else
             Container(
               width: bar,

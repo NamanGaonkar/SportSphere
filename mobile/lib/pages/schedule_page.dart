@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/sports.dart';
+import '../widgets/common.dart' show subT;
 
 class MatchItem {
   final String id;
@@ -144,7 +145,7 @@ class _SchedulePageState extends State<SchedulePage> {
                             onSelected: (_) => setState(() => _sportFilter = null),
                             selectedColor: const Color(0xFFFF6A13),
                             labelStyle: TextStyle(
-                              color: _sportFilter == null ? Colors.white : Colors.black54,
+                              color: _sportFilter == null ? Colors.white : subT(context),
                               fontWeight: _sportFilter == null ? FontWeight.w700 : FontWeight.w400,
                             ),
                             showCheckmark: false,
@@ -159,7 +160,7 @@ class _SchedulePageState extends State<SchedulePage> {
                               onSelected: (_) => setState(() => _sportFilter = s['id'] as String),
                               selectedColor: const Color(0xFFFF6A13),
                               labelStyle: TextStyle(
-                                color: _sportFilter == s['id'] ? Colors.white : Colors.black54,
+                                color: _sportFilter == s['id'] ? Colors.white : subT(context),
                                 fontWeight: _sportFilter == s['id'] ? FontWeight.w700 : FontWeight.w400,
                               ),
                               showCheckmark: false,
@@ -174,8 +175,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   if (_filteredUpcoming.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text('No upcoming matches.',
-                          style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                      child: Text('No upcoming matches.', style: TextStyle(color: subT(context))),
                     ),
                   ..._filteredUpcoming.map(_matchCard),
                   const SizedBox(height: 24),
@@ -184,8 +184,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   if (_filteredResults.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text('No results yet.',
-                          style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                      child: Text('No results yet.', style: TextStyle(color: subT(context))),
                     ),
                   ..._filteredResults.take(10).map(_matchCard),
                 ],
@@ -231,7 +230,7 @@ class _SchedulePageState extends State<SchedulePage> {
                 Expanded(
                   child: Text(m.tournament,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.45))),
+                      style: TextStyle(fontSize: 12, color: subT(context))),
                 ),
               ],
             ),
@@ -250,7 +249,7 @@ class _SchedulePageState extends State<SchedulePage> {
               ],
             ),
             const SizedBox(height: 6),
-            Text(_fmt(m.when), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.5))),
+            Text(_fmt(m.when), style: TextStyle(fontSize: 12, color: subT(context))),
           ],
         ),
       ),
