@@ -1,3 +1,5 @@
+import 'dart:math' show sqrt;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -264,11 +266,18 @@ class _DrawerNavListState extends State<_DrawerNavList> {
   }
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMixin {
   String? _role;
   String _current = 'Dashboard';
   List<_NavSection> _sections = const [];
   final Map<String, Widget> _pageCache = {};
+
+  /// Circle-reveal overlay animation on section switch (paint-only, see
+  /// body Stack). Restarted whenever [_current] changes.
+  late final AnimationController _reveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
   // Drawer nav scroll memory: the offset is continuously saved while the
   // user scrolls, and each drawer open creates a FRESH controller starting
   // at the saved offset — so closing and reopening the drawer lands exactly
@@ -336,6 +345,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    _reveal.dispose();
     super.dispose();
   }
 
@@ -360,7 +370,10 @@ class _HomeShellState extends State<HomeShell> {
   void openFromDashboard(String label) {
     final exists = _sections.expand((s) => s.items).any((i) => i.label == label);
     if (!exists) return;
-    setState(() => _current = label);
+    if (_current != label) {
+      setState(() => _current = label);
+      _reveal.forward(from: 0);
+    }
     _prefs?.setString(_kPrefKey, label);
   }
 
@@ -437,7 +450,10 @@ class _HomeShellState extends State<HomeShell> {
                         sections: _sections,
                         current: _current,
                         onSelect: (label) {
-                          setState(() => _current = label);
+                          if (_current != label) {
+                            setState(() => _current = label);
+                            _reveal.forward(from: 0);
+                          }
                           // Remember the user's choice across sessions.
                           _prefs?.setString(_kPrefKey, label);
                           Navigator.pop(context);
@@ -529,50 +545,69 @@ class _HomeShellState extends State<HomeShell> {
       ),
       body: items.isEmpty
           ? const LoadingState()
-          : AnimatedSwitcher(
-              // Circle-in transition when the section changes: the page is
-              // clipped in through an expanding circle (web parity).
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeIn,
-              transitionBuilder: (child, anim) => ClipPath(
-                clipper: _CircleRevealClipper(reveal: anim),
-                child: child,
-              ),
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                alignment: Alignment.topLeft,
-                children: [...previousChildren, ?currentChild],
-              ),
-              child: KeyedSubtree(
-                key: ValueKey(currentLabel),
-                child: IndexedStack(
+          : Stack(
+              children: [
+                // Pages stay PERMANENTLY mounted (no remount on switch —
+                // remounting was blanking the section while it refetched
+                // and doubling all realtime listeners = lag).
+                IndexedStack(
                   index: currentIndex,
                   children: _allPages,
                 ),
-              ),
+                // Circle reveal drawn as an OVERLAY on top: pure paint,
+                // zero rebuilds of the pages underneath.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _reveal,
+                      builder: (context, _) => _reveal.value == 0
+                          ? const SizedBox.shrink()
+                          : CustomPaint(
+                              painter: _RevealPainter(
+                                t: _reveal.value,
+                                dark: Theme.of(context).brightness == Brightness.dark,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
 }
 
-/// Clip that opens from the top-left (where the menu button sits) with an
-/// expanding radius driven by the switch animation.
-class _CircleRevealClipper extends CustomClipper<Path> {
-  final Animation<double> reveal;
-  _CircleRevealClipper({required this.reveal});
+/// Expanding circle-ring overlay for section switches. Paints only —
+/// nothing underneath remounts, so no blank flash, no refetch, no lag.
+class _RevealPainter extends CustomPainter {
+  final double t;
+  final bool dark;
+  _RevealPainter({required this.t, required this.dark});
 
   @override
-  Path getClip(Size size) {
-    final t = reveal.value;
-    // Diagonal length so the circle always covers the whole screen at t=1.
-    final maxR = (size.width * size.width + size.height * size.height);
-    final r = maxR * Curves.easeOut.transform(t.clamp(0.0, 1.0));
-    return Path()
-      ..addOval(Rect.fromCircle(center: const Offset(56, 48), radius: r));
+  void paint(Canvas canvas, Size size) {
+    final center = const Offset(56, 48); // menu button corner
+    final maxR = sqrt(size.width * size.width + size.height * size.height);
+    final r = maxR * Curves.easeOut.transform(t);
+    final fade = (1 - t).clamp(0.0, 1.0);
+
+    // Soft radial tint that sweeps out with the ring.
+    final fill = Paint()
+      ..shader = RadialGradient(
+        colors: [Brand.primary.withValues(alpha: 0.10 * fade), Brand.primary.withValues(alpha: 0.0)],
+      ).createShader(Rect.fromCircle(center: center, radius: r));
+    canvas.drawCircle(center, r, fill);
+
+    // The ring itself, thinning as it expands.
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3 + 5 * fade
+      ..color = Brand.primary.withValues(alpha: (dark ? 0.55 : 0.45) * fade);
+    canvas.drawCircle(center, r, ring);
   }
 
   @override
-  bool shouldReclip(_CircleRevealClipper old) => old.reveal.value != reveal.value;
+  bool shouldRepaint(_RevealPainter old) => old.t != t || old.dark != dark;
 }
 
 // ------------------------------------------------------------------
