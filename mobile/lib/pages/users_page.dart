@@ -334,7 +334,12 @@ class _UsersPageState extends State<UsersPage> {
   @override
   Widget build(BuildContext context) {
     final rows = _filtered;
-    return RefreshIndicator(
+    // DefaultTabController drives the Active/Deleted TabBar below — a bare
+    // TabBar has no controller, throws in release mode, and blanked the
+    // whole page (tester report).
+    return DefaultTabController(
+      length: 2,
+      child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -424,6 +429,7 @@ class _UsersPageState extends State<UsersPage> {
                       ),
           ),
         ],
+      ),
       ),
     );
   }
