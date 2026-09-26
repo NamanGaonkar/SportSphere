@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { useSports, useRealtimeTable } from '../lib/hooks'
+import { useSports, useRealtimeTable, sportNameById } from '../lib/hooks'
 import { attendanceWindow } from '../lib/dates'
 import { PageHead, Section, EmptyState, LoadingState } from '../components/ui'
 import Box from '@mui/material/Box'
@@ -47,7 +47,7 @@ export default function Reports() {
   const [attData, setAttData] = useState<{ day: string; present: number | null }[]>([])
   const [awards, setAwards] = useState<AwardRow[]>([])
   const [loading, setLoading] = useState(true)
-  const { sports, byId } = useSports()
+  const { sports } = useSports()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,7 +69,11 @@ export default function Reports() {
 
     const tm = new Map<string, number>()
     for (const t of (tms.data as { sport_id: string | null }[]) ?? []) {
-      const key = byId(t.sport_id) || 'No sport'
+      // Cache-safe lookup: `byId` from useSports is a render-scoped closure
+      // that load() captured STALE (empty sports on cold reload), so every
+      // team mapped to "No sport" and the pie showed nothing until a tab
+      // switch. sportNameById always reads the latest shared cache.
+      const key = sportNameById(t.sport_id) || 'No sport'
       tm.set(key, (tm.get(key) ?? 0) + 1)
     }
     setTeamsSportData([...tm.entries()].map(([name, value]) => ({ name, value })))
