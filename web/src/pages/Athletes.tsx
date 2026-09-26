@@ -3,7 +3,6 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
-import MenuItem from '@mui/material/MenuItem'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -25,7 +24,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import Avatar from '@mui/material/Avatar'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
-import { SportMultiSelect } from '../components/SportSelect'
+import { SportMultiSelect, TeamSelectScoped } from '../components/SportSelect'
 import { PageHead, Badge, EmptyState, LoadingState } from '../components/ui'
 import ExpandableRow from '../components/ExpandableRow'
 import dataTableSx from '../components/tableSx'
@@ -39,13 +38,11 @@ type Athlete = {
   teams: { name: string } | null
   athlete_sports: { sports: { name: string } | null }[] | null
 }
-type Team = { id: string; name: string }
 
 const empty = { full_name: '', sportIds: [] as string[], dob: '', team_id: '', medical_notes: '' }
 
 export default function Athletes() {
   const [rows, setRows] = useState<Athlete[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
   const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
@@ -57,15 +54,11 @@ export default function Athletes() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const [ath, tm] = await Promise.all([
-      supabase
-        .from('athletes')
-        .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(name), athlete_sports(sports(name))')
-        .order('created_at'),
-      supabase.from('teams').select('id, name').order('name'),
-    ])
-    setRows((ath.data as unknown as Athlete[]) ?? [])
-    setTeams((tm.data as Team[]) ?? [])
+    const { data: ath } = await supabase
+      .from('athletes')
+      .select('*, profile:profiles(id, full_name, contact_info, avatar_url), teams(name), athlete_sports(sports(name))')
+      .order('created_at')
+    setRows((ath as unknown as Athlete[]) ?? [])
     setLoading(false)
   }, [])
 
@@ -276,10 +269,15 @@ export default function Athletes() {
               <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required fullWidth />
               <SportMultiSelect value={form.sportIds} onChange={(v) => setForm({ ...form, sportIds: v })} />
               <TextField type="date" label="Date of birth" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-              <TextField select label="Team" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })} fullWidth>
-                <MenuItem value="">None</MenuItem>
-                {teams.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-              </TextField>
+              {/* Team list cascades from the FIRST selected sport (round 3 #5):
+                  a cricket athlete only sees cricket teams. Cross-sport team
+                  picks are also rejected by the DB guard. */}
+              <TeamSelectScoped
+                value={form.team_id}
+                onChange={(v) => setForm({ ...form, team_id: v })}
+                sportId={form.sportIds[0] ?? ''}
+                emptyLabel="None"
+              />
               <Box sx={{ gridColumn: '1 / -1' }}>
                 <TextField label="Medical notes" multiline minRows={2} value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} fullWidth />
               </Box>

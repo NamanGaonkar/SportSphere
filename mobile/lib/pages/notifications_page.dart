@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../widgets/common.dart' show faintT, subT;
 import '../data/sports.dart' show listen;
 import '../main.dart' show Brand;
 
@@ -143,10 +144,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           child: Column(
                             children: [
                               Icon(Icons.notifications_none,
-                                  size: 40, color: Colors.black.withValues(alpha: 0.25)),
+                                  size: 40, color: faintT(context)),
                               const SizedBox(height: 12),
                               Text('No notifications.',
-                                  style: TextStyle(color: Colors.black.withValues(alpha: 0.45))),
+                                  style: TextStyle(color: subT(context))),
                             ],
                           ),
                         ),
@@ -194,12 +195,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               leading: Icon(
                                 read ? Icons.notifications_none : Icons.notifications_active,
                                 size: 22,
-                                color: read ? Colors.black26 : Brand.primary,
+                                color: read ? faintT(context) : Brand.primary,
                               ),
                               title: Text(
                                 n['message'].toString(),
                                 style: TextStyle(
-                                    fontSize: 13.5, color: read ? Colors.black45 : Colors.black),
+                                    fontSize: 13.5,
+                                    color: read
+                                        ? subT(context)
+                                        : Theme.of(context).colorScheme.onSurface),
                               ),
                               subtitle: Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -207,9 +211,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   created != null
                                       ? "${created.day}/${created.month} - ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}"
                                       : '',
-                                  style: TextStyle(
-                                      fontSize: 11, color: Colors.black.withValues(alpha: 0.35)),
-                                ),
+                                  style: TextStyle(fontSize: 11, color: faintT(context))),
                               ),
                               trailing: read
                                   ? null

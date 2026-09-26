@@ -867,10 +867,12 @@ class _CrudFormState extends State<_CrudForm> {
             for (final o in f.options!) (value: o, label: o),
           ...(widget.sources[f.key] ?? const []),
         ];
-        return DropdownButtonFormField<String>(
-          initialValue: '${_form[f.key] ?? ''}',
-          isExpanded: true,
-          decoration: InputDecoration(labelText: f.label),
+        // Shared SmartDropdown: trigger spans the field, long option lists
+        // (21+ sports, many teams/venues) scroll inside a bounded menu, and
+        // menu colors stay readable in dark mode (global round 3 #11, #18).
+        return SmartDropdown<String>(
+          value: '${_form[f.key] ?? ''}',
+          labelText: f.label,
           items: [
             for (final o in opts)
               DropdownMenuItem(value: o.value, child: Text(o.label, overflow: TextOverflow.ellipsis)),

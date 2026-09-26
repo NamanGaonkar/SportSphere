@@ -100,8 +100,13 @@ class _InventoryPageState extends State<InventoryPage> {
                   padding: const EdgeInsets.all(14),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('LOW STOCK (${low.length})',
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB26A00))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Brand.primaryHover
+                                : const Color(0xFFB26A00))),
                     const SizedBox(height: 8),
                     for (final i in low)
                       Padding(
@@ -123,7 +128,8 @@ class _InventoryPageState extends State<InventoryPage> {
                 Tab(text: 'Stock movements'),
               ],
               labelColor: Brand.primary,
-              unselectedLabelColor: Colors.black54,
+              // Theme-aware: black54 vanished in dark mode (round 3 #10).
+              unselectedLabelColor: subT(context),
               indicatorColor: Brand.primary,
               onTap: (i) => setState(() => _tab = i),
             ),
@@ -181,8 +187,8 @@ class _InventoryPageState extends State<InventoryPage> {
             DataCell(GestureDetector(
               onTap: () => _edit(r),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${r['name'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                Text('${r['category'] ?? '-'}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                Text('${r['name'] ?? '-'}', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurface)),
+                Text('${r['category'] ?? '-'}', style: TextStyle(fontSize: 11, color: subT(context))),
               ]),
             )),
             DataCell(BadgeChip('$qty ${r['unit'] ?? ''}',
@@ -276,9 +282,9 @@ Future<void> _move(DbRow item) async {
         builder: (ctx, setD) => AlertDialog(
           title: Text('Stock movement - ${item['name']}'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            DropdownButtonFormField<String>(
-              initialValue: type,
-              decoration: const InputDecoration(labelText: 'Type'),
+            SmartDropdown<String>(
+              value: type,
+              labelText: 'Type',
               items: const [
                 DropdownMenuItem(value: 'IN', child: Text('IN - stock received')),
                 DropdownMenuItem(value: 'OUT', child: Text('OUT - issued / consumed')),
@@ -300,7 +306,7 @@ Future<void> _move(DbRow item) async {
             Align(
               alignment: Alignment.centerLeft,
               child: Text('Current stock: ${item['quantity']} ${item['unit'] ?? ''}',
-                  style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                  style: TextStyle(fontSize: 11.5, color: subT(context))),
             ),
           ]),
           actions: [
@@ -361,10 +367,9 @@ Future<void> _move(DbRow item) async {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: catSelection.isEmpty ? null : catSelection,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Category'),
+              SmartDropdown<String>(
+                value: catSelection,
+                labelText: 'Category',
                 items: [
                   const DropdownMenuItem(value: '', child: Text('Select category')),
                   for (final c in _categories) DropdownMenuItem(value: c, child: Text(c)),
@@ -395,12 +400,12 @@ Future<void> _move(DbRow item) async {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text('Quantity: ${editing['quantity']} (use stock movements to change)',
-                      style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                      style: TextStyle(fontSize: 12, color: subT(context))),
                 ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: condition,
-                decoration: const InputDecoration(labelText: 'Condition'),
+              SmartDropdown<String>(
+                value: condition,
+                labelText: 'Condition',
                 items: const ['New', 'Good', 'Worn', 'Damaged', 'Under maintenance']
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),

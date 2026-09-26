@@ -203,11 +203,15 @@ class _DrawerNavListState extends State<_DrawerNavList> {
 
   @override
   Widget build(BuildContext context) {
+    // Gradient rail: ink scales with the local gradient darkness so every
+    // item stays readable from the pale top-left to the deeper bottom-right.
+    final ink = widget.dark ? const Color(0xFF331503) : Colors.white;
+    final inkSoft =
+        widget.dark ? const Color(0xFF331503).withValues(alpha: 0.75) : Colors.white.withValues(alpha: 0.72);
     return ListView(
       controller: _scroll,
       padding: const EdgeInsets.symmetric(vertical: 4),
-      children: [
-        for (final s in widget.sections) ...[
+      children: [          for (final s in widget.sections) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 0, 4),
             child: Text(s.section.toUpperCase(),
@@ -215,7 +219,7 @@ class _DrawerNavListState extends State<_DrawerNavList> {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
-                    color: Colors.white.withValues(alpha: widget.dark ? 0.6 : 0.42))),
+                    color: inkSoft.withValues(alpha: widget.dark ? 0.85 : 0.42))),
           ),
           for (final item in s.items)
             Padding(
@@ -227,7 +231,7 @@ class _DrawerNavListState extends State<_DrawerNavList> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   margin: const EdgeInsets.symmetric(vertical: 1),
                   decoration: BoxDecoration(
-                    // Dark mode: orange rail with a BLACK selected pill.
+                    // Dark mode: gradient rail with a BLACK selected pill.
                     // Light mode: black rail with the orange selected pill.
                     color: widget.current == item.label
                         ? (widget.dark ? const Color(0xFF141414) : Brand.primary)
@@ -239,18 +243,17 @@ class _DrawerNavListState extends State<_DrawerNavList> {
                       Icon(item.icon,
                           size: 20,
                           color: widget.current == item.label
-                              ? (widget.dark ? Brand.primary : Colors.white)
-                              : Colors.white.withValues(alpha: widget.dark ? 0.92 : 0.7)),
+                              ? (widget.dark ? Brand.primaryHover : Colors.white)
+                              : ink.withValues(alpha: widget.dark ? 0.9 : 0.7)),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(item.label,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.white.withValues(
-                                    alpha: widget.current == item.label
-                                        ? 1
-                                        : (widget.dark ? 0.92 : 0.72)),
+                                color: widget.current == item.label
+                                    ? (widget.dark ? Colors.white : Colors.white)
+                                    : ink.withValues(alpha: widget.dark ? 0.9 : 0.72),
                                 fontWeight: widget.current == item.label
                                     ? FontWeight.w700
                                     : FontWeight.w400)),
@@ -395,13 +398,20 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),              child: Builder(builder: (context) {
-                // Dark mode: the rail flips to brand orange and the selected
-                // item becomes black (light mode keeps the black rail).
+                // Dark mode: the rail flips to a SOFT orange gradient and the
+                // selected item becomes black (light mode keeps the black
+                // rail). The flat #FF6A13 was too punchy (user round 3 #23).
                 final dark = ThemeController.instance.isDark;
-                final railColor = dark ? Brand.primary : Brand.black;
+                // Gradient rail ink: dark brown on the pale orange gradient,
+                // white on the light theme's black rail.
+                final ink = dark ? const Color(0xFF331503) : Colors.white;
+                final inkSoft = dark
+                    ? const Color(0xFF331503).withValues(alpha: 0.75)
+                    : Colors.white.withValues(alpha: 0.72);
                 return Container(
                   decoration: BoxDecoration(
-                    color: railColor,
+                    color: dark ? null : Brand.black,
+                    gradient: dark ? Brand.railGradient : null,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                         color: dark
@@ -424,10 +434,10 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
                       children: [
                         Image.asset('assets/images/logo.png', width: 28, height: 32, fit: BoxFit.contain),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Text('SportSphere',
                               style: TextStyle(
-                                  color: Colors.white,
+                                  color: ink,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
                                   letterSpacing: 0.2)),
@@ -474,12 +484,12 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
                               Text(
                                 Supabase.instance.client.auth.currentUser?.email ?? '',
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    color: ink, fontSize: 12.5, fontWeight: FontWeight.w600),
                               ),
                               Text(_role ?? '',
                                   style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                                      color: inkSoft, fontSize: 11)),
                             ],
                           ),
                         ),
@@ -491,9 +501,9 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
                             padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                              border: Border.all(color: inkSoft.withValues(alpha: 0.4)),
                             ),
-                            child: const Icon(Icons.logout, color: Colors.white70, size: 19),
+                            child: Icon(Icons.logout, color: inkSoft, size: 19),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -505,11 +515,11 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
                             padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                              border: Border.all(color: inkSoft.withValues(alpha: 0.4)),
                             ),
                             child: Icon(
                               ThemeController.instance.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                              color: Colors.white70,
+                              color: inkSoft,
                               size: 19,
                             ),
                           ),
@@ -806,8 +816,7 @@ class _DashboardHomeState extends State<DashboardHome> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_name.isNotEmpty) ...[
-            Text(_name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+          if (_name.isNotEmpty) ...[              Text(_name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
             Text(_role, style: TextStyle(fontSize: 12.5, color: subText(context))),
             const SizedBox(height: 14),
           ],
@@ -1044,16 +1053,65 @@ class _DashboardHomeState extends State<DashboardHome> {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('$_pendingPO', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Brand.primary)),
-                    Text('POs awaiting delivery', style: TextStyle(fontSize: 11.5, color: subText(context))),
-                  ]),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Vendors & Purchases'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('$_pendingPO',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: _pendingPO > 0 ? Brand.primary : subText(context))),
+                        Text('POs awaiting delivery', style: TextStyle(fontSize: 11.5, color: subText(context))),
+                      ]),
+                    ),
+                  ),
                 ),
                 Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${_equip.length}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                    Text('Equipment items tracked', style: TextStyle(fontSize: 11.5, color: subText(context))),
-                  ]),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Inventory'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${_equip.length}',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.onSurface)),
+                        Text('Equipment items tracked', style: TextStyle(fontSize: 11.5, color: subText(context))),
+                      ]),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            title: 'Medical',
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Medical'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${_med.where((m) => m['cleared'] == false).length}',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: _med.any((m) => m['cleared'] == false)
+                                    ? const Color(0xFFC62828)
+                                    : subText(context))),
+                        Text('Athletes not cleared', style: TextStyle(fontSize: 11.5, color: subText(context))),
+                      ]),
+                    ),
+                  ),
                 ),
               ],
             ),

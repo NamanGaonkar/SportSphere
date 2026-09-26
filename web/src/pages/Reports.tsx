@@ -47,7 +47,7 @@ export default function Reports() {
   const [attData, setAttData] = useState<{ day: string; present: number | null }[]>([])
   const [awards, setAwards] = useState<AwardRow[]>([])
   const [loading, setLoading] = useState(true)
-  const { byId } = useSports()
+  const { sports, byId } = useSports()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +84,14 @@ export default function Reports() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  // Cold reload fix (#21): the teams query can resolve BEFORE the shared
+  // sports cache, so every team mapped to "No sport" and the pie rendered
+  // empty until a tab switch. Re-aggregate once the sport names arrive.
+  const sportsReady = sports.length > 0
+  useEffect(() => {
+    if (sportsReady) void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sportsReady])
   useRealtimeTable('athlete_sports', load)
   useRealtimeTable('teams', load)
   useRealtimeTable('attendance', load)

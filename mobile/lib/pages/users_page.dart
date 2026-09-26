@@ -99,6 +99,31 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  /// Shared dialog action row: Cancel + Save get IDENTICAL heights and
+  /// padding (side-by-side Expanded buttons — text-only Cancel next to a
+  /// filled Save read as uneven, tester round 3 #3).
+  List<Widget> _dialogActions(VoidCallback onCancel) {
+    return [
+      Row(children: [
+        Expanded(
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+            onPressed: onCancel,
+            child: const Text('Cancel'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
+          ),
+        ),
+      ]),
+    ];
+  }
+
   Future<void> _rename(DbRow r) async {
     final ctrl = TextEditingController(text: '${r['full_name']}');
     final ok = await showDialog<bool>(
@@ -106,10 +131,7 @@ class _UsersPageState extends State<UsersPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Rename user'),
         content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(labelText: 'Full name')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-        ],
+        actions: _dialogActions(() => Navigator.pop(ctx)),
       ),
     );
     if (ok != true || ctrl.text.trim().isEmpty || ctrl.text.trim() == r['full_name']) return;
@@ -128,10 +150,7 @@ class _UsersPageState extends State<UsersPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Edit phone'),
         content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(labelText: 'Phone number')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-        ],
+        actions: _dialogActions(() => Navigator.pop(ctx)),
       ),
     );
     if (ok != true) return;

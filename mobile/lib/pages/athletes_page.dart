@@ -157,7 +157,7 @@ class _AthletesPageState extends State<AthletesPage> {
                           DataCell(BadgeChip(medical.length > 24 ? '${medical.substring(0, 24)}...' : medical,
                               color: const Color(0xFFB26A00)))
                         else
-                          const DataCell(Text('-', style: TextStyle(color: Colors.black38))),
+                          DataCell(Text('-', style: TextStyle(color: faintT(context)))),
                         DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(
                             visualDensity: VisualDensity.compact,
@@ -246,17 +246,20 @@ class _AthletesPageState extends State<AthletesPage> {
                       ],
                     ),
                     if (sports.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text('Loading sports...',
-                            style: TextStyle(fontSize: 12.5, color: Colors.black45)),
+                            style: TextStyle(fontSize: 12.5, color: subT(ctx))),
                       )
                     else
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black12),
+                          border: Border.all(
+                              color: Theme.of(ctx).brightness == Brightness.dark
+                                  ? Brand.darkBorder
+                                  : Colors.black12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Wrap(
@@ -269,7 +272,7 @@ class _AthletesPageState extends State<AthletesPage> {
                                 labelStyle: TextStyle(
                                   color: sportIds.contains('${s['id']}')
                                       ? const Color(0xFF8A3D00)
-                                      : Brand.black,
+                                      : Theme.of(ctx).colorScheme.onSurface,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 12.5,
                                 ),
@@ -289,7 +292,7 @@ class _AthletesPageState extends State<AthletesPage> {
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
                             '${sportIds.length} sport${sportIds.length == 1 ? '' : 's'} selected',
-                            style: const TextStyle(fontSize: 11.5, color: Colors.black45)),
+                            style: TextStyle(fontSize: 11.5, color: subT(ctx))),
                       ),
                     const SizedBox(height: 16),
                     DateField(
@@ -300,10 +303,9 @@ class _AthletesPageState extends State<AthletesPage> {
                       onChanged: (v) => setM(() => dob = v ?? ''),
                     ),
                     const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      initialValue: teamId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Team'),
+                    SmartDropdown<String>(
+                      value: teamId,
+                      labelText: 'Team',
                       items: [
                         const DropdownMenuItem(value: '', child: Text('None')),
                         for (final t in _teams)

@@ -103,7 +103,7 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
               Text(
                 '${((m['team_a'] ?? {}) as Map)['name'] ?? 'TBD'} vs ${((m['team_b'] ?? {}) as Map)['name'] ?? 'TBD'}'
                 ' - enter ${kindLabel(kind)}',
-                style: const TextStyle(fontSize: 12.5, color: Colors.black54),
+                style: TextStyle(fontSize: 12.5, color: subT(context)),
               ),
               const SizedBox(height: 14),
               for (final d in defs) ...[
@@ -261,7 +261,7 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
             '${((m['tournaments'] ?? {}) as Map)['name'] ?? '-'} - '
             '${((m['venues'] ?? {}) as Map)['name'] ?? '-'} - '
             '${when == null ? '-' : fmtDateTime(when.toIso8601String())}',
-            style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+            style: TextStyle(fontSize: 11.5, color: subT(context)),
           ),
           const SizedBox(height: 8),
           Row(
@@ -287,12 +287,12 @@ class _MatchesAdminPageState extends State<MatchesAdminPage> {
                 icon: const Icon(Icons.scoreboard_outlined, size: 20),
                 onPressed: () => _recordScore(m),
               ),
+              // Status dropdown: matches the status buttons' width and uses
+              // the shared SmartDropdown (dark menu, capped+scrollable).
               SizedBox(
                 width: 132,
-                child: DropdownButtonFormField<String>(
-                  initialValue: status,
-                  isDense: true,
-                  decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                child: SmartDropdown<String>(
+                  value: status,
                   items: [
                     // No Live option — scores are final results (web parity).
                     for (final s in ['Scheduled', 'Completed', 'Cancelled'])

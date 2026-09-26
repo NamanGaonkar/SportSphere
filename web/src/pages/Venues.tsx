@@ -153,7 +153,9 @@ export default function Venues() {
           }}
         >
           {rows.map((v) => (
-            <Paper key={v.id} sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            // height: 100% makes every card in a grid row equal height, so
+            // the action buttons line up across cards (round 3 #20).
+            <Paper key={v.id} sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 1, height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                 <Typography variant="h6">{v.name}</Typography>
                 <Badge color={statusColor(v.status)}>{v.status}</Badge>
@@ -195,14 +197,34 @@ export default function Venues() {
               {v.facility_details && (
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{v.facility_details}</Typography>
               )}
+              {/* Spacer pushes the action row to the bottom of equal-height
+                  cards; labeled buttons with type="button" — bare unlabeled
+                  icon buttons read as dead decoration and mis-clicked
+                  (round 3 #20: "buttons not functional"). */}
+              <Box sx={{ flex: 1 }} />
               {canEdit && (
-                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                  <IconButton size="small" onClick={() => openEdit(v)} aria-label="Edit">
-                    <EditOutlinedIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color="error" onClick={() => remove(v.id)} aria-label="Delete">
-                    <DeleteOutlinedIcon fontSize="small" />
-                  </IconButton>
+                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 0.5 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    type="button"
+                    startIcon={<EditOutlinedIcon />}
+                    onClick={() => openEdit(v)}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    type="button"
+                    color="error"
+                    startIcon={<DeleteOutlinedIcon />}
+                    onClick={() => remove(v.id)}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Delete
+                  </Button>
                 </Box>
               )}
             </Paper>

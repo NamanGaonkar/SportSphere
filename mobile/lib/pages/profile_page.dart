@@ -360,13 +360,16 @@ class _ProfilePageState extends State<ProfilePage> {
                                 Expanded(
                                   child: Text('${a['title']}',
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                                      style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context).colorScheme.onSurface)),
                                 ),
                                 Text('${a['level'] ?? '-'}',
-                                    style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                    style: TextStyle(fontSize: 12, color: subT(context))),
                                 const SizedBox(width: 8),
                                 Text(fmtDate(a['date']?.toString()),
-                                    style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                    style: TextStyle(fontSize: 12, color: subT(context))),
                               ],
                             ),
                           ),
@@ -402,6 +405,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _kv(String key, String? value) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -409,11 +413,16 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           SizedBox(
             width: 110,
-            child: Text(key, style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
+            // Label lifted toward white in dark mode — black54 vanished on
+            // the dark card (tester round 3 #2).
+            child: Text(key, style: TextStyle(fontSize: 12.5, color: dark ? Colors.white60 : Colors.black54)),
           ),
           Expanded(
-            child: Text(value ?? '-',
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            child: SelectableText(value ?? '-',
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: dark ? Colors.white : const Color(0xFF1A1A1A))),
           ),
         ],
       ),

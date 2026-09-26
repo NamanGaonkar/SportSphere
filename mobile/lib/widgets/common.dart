@@ -16,23 +16,40 @@ Color faintT(BuildContext context) => Theme.of(context).brightness == Brightness
     : Colors.black.withValues(alpha: 0.3);
 
 /// Mirrors web/src/components/ui.tsx statusColor().
+/// Every module status has its own color — venue bookings, transport,
+/// payroll and purchase orders included — so a badge is never a generic
+/// gray blob on either platform.
 Color statusColor(String s) {
   switch (s) {
     case 'Present':
     case 'Completed':
     case 'Active':
     case 'Done':
+    case 'Confirmed':
+    case 'Paid':
+    case 'Received':
+    case 'Approved':
+    case 'Checked-in':
       return const Color(0xFF2E7D32);
-    case 'Live':
     case 'Scheduled':
+    case 'Live':
+    case 'Ordered':
+    case 'Booked':
+    case 'Planned':
+    case 'In Transit':
       return const Color(0xFF1565C0);
     case 'Late':
     case 'Maintenance':
     case 'In Progress':
+    case 'Pending':
+    case 'On Hold':
+    case 'Draft':
+    case 'Reported':
       return const Color(0xFFB26A00);
     case 'Absent':
     case 'Cancelled':
     case 'Not cleared':
+    case 'Rejected':
       return const Color(0xFFC62828);
     default:
       return const Color(0xFF757575);
@@ -269,15 +286,71 @@ String inrCompact(num? n) {
 class BadgeChip extends StatelessWidget {
   final String text;
   final Color color;
-  const BadgeChip(this.text, {super.key, required this.color});
+  /// Wrap onto a second line instead of truncating to "In Progres…" —
+  /// status words must be readable in full on a phone (tester round 3).
+  final int maxLines;
+  const BadgeChip(this.text, {super.key, required this.color, this.maxLines = 2});
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+          // Higher tint in dark mode so the pill is visible on the dark card.
+          color: color.withValues(alpha: dark ? 0.24 : 0.14),
+          borderRadius: BorderRadius.circular(999)),
       child: Text(text,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color), overflow: TextOverflow.ellipsis),
+          maxLines: maxLines,
+          softWrap: true,
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              // Light tinted chips need the deep color; on the dark card the
+              // deep colors are too dim — lift toward the hover/accent tone.
+              color: dark ? Color.lerp(color, Colors.white, 0.35)! : color)),
+    );
+  }
+}
+
+/// Shared dark-mode-aware dropdown for forms everywhere on the phone:
+/// - trigger is exactly as wide as the field (isExpanded)
+/// - menu is capped at ~7.5 rows with its own scrollbar when longer
+/// - menu + text colors stay readable in dark AND light mode
+class SmartDropdown<T> extends StatelessWidget {
+  final T? value;
+  final String? hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  final String? labelText;
+  const SmartDropdown({
+    super.key,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.labelText,
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      // Long lists scroll inside a bounded menu instead of covering the
+      // whole screen (21+ sports / dozens of teams).
+      menuMaxHeight: 320,
+      borderRadius: BorderRadius.circular(10),
+      dropdownColor: dark ? Brand.darkSurfaceAlt : Colors.white,
+      style: TextStyle(fontSize: 14.5, color: Theme.of(context).colorScheme.onSurface),
+      icon: Icon(Icons.expand_more, size: 20, color: subT(context)),
+      decoration: InputDecoration(
+        labelText: labelText,
+        hintText: hint,
+      ),
+      items: items,
+      onChanged: onChanged,
     );
   }
 }
@@ -475,8 +548,13 @@ class _PagedTableState<T> extends State<PagedTable<T>> {
       Widget headerCell(int i) => Container(
             width: widths[i],
             padding: EdgeInsets.symmetric(horizontal: colGap, vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(right: BorderSide(color: Color(0xFFE4E4DC), width: 0.8)),
+            decoration: BoxDecoration(
+              border: Border(
+                  right: BorderSide(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Brand.darkBorder
+                          : const Color(0xFFE4E4DC),
+                      width: 0.8)),
             ),
             child: Align(
               alignment: Alignment.centerLeft,

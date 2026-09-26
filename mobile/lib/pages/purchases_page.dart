@@ -103,7 +103,8 @@ class _PurchasesPageState extends State<PurchasesPage> {
                 Tab(text: 'Vendors'),
               ],
               labelColor: Brand.primary,
-              unselectedLabelColor: Colors.black54,
+              // Theme-aware: black54 was invisible in dark mode (round 3 #13).
+              unselectedLabelColor: subT(context),
               indicatorColor: Brand.primary,
               onTap: (i) => setState(() => _tab = i),
             ),
@@ -191,9 +192,9 @@ class _PurchasesPageState extends State<PurchasesPage> {
           final po = (i['purchase_orders'] ?? {}) as Map;
           return DataRow(cells: [
             DataCell(Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${i['description']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              Text('${i['description']}', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurface)),
               Text('${((i['inventory_items'] ?? {}) as Map)['name'] ?? 'Unlinked'}',
-                  style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                  style: TextStyle(fontSize: 11, color: subT(context))),
             ])),
             DataCell(Text('$qty')),
             DataCell(Text(inr(cost))),
@@ -248,9 +249,9 @@ class _PurchasesPageState extends State<PurchasesPage> {
           builder: (ctx, setD) => AlertDialog(
             title: const Text('Add line item'),
             content: Column(mainAxisSize: MainAxisSize.min, children: [
-              DropdownButtonFormField<String>(
-                initialValue: itemId,
-                decoration: const InputDecoration(labelText: 'Inventory item (optional link)'),
+              SmartDropdown<String>(
+                value: itemId ?? '',
+                labelText: 'Inventory item (optional link)',
                 items: [
                   const DropdownMenuItem(value: '', child: Text('Custom (no stock link)')),
                   for (final i in _inventory) DropdownMenuItem(value: '${i['id']}', child: Text('${i['name']}')),
@@ -297,16 +298,19 @@ class _PurchasesPageState extends State<PurchasesPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: vendorId,
-                  decoration: const InputDecoration(labelText: 'Vendor'),
-                  items: [for (final v in _vendors) DropdownMenuItem(value: '${v['id']}', child: Text('${v['name']}'))],
-                  onChanged: (v) => setD(() => vendorId = v),
+                SmartDropdown<String>(
+                  value: vendorId ?? '',
+                  labelText: 'Vendor',
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('Select vendor')),
+                    for (final v in _vendors) DropdownMenuItem(value: '${v['id']}', child: Text('${v['name']}')),
+                  ],
+                  onChanged: (v) => setD(() => vendorId = (v == null || v.isEmpty) ? null : v),
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: status,
-                  decoration: const InputDecoration(labelText: 'Status'),
+                SmartDropdown<String>(
+                  value: status,
+                  labelText: 'Status',
                   items: [for (final s in _poStatuses) DropdownMenuItem(value: s, child: Text(s))],
                   onChanged: (v) => setD(() => status = v ?? 'Draft'),
                 ),
@@ -316,7 +320,7 @@ class _PurchasesPageState extends State<PurchasesPage> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text('- ${l.descr} x${l.qty} @ ${l.cost}',
-                        style: const TextStyle(fontSize: 12.5, color: Colors.black87)),
+                        style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85))),
                   ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(

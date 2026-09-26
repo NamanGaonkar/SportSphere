@@ -197,27 +197,40 @@ class _CoachesPageState extends State<CoachesPage> {
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      // Full-height sheet: the form keeps its own scroll and the sheet stops
+      // well below the status bar, so dragging can never collide with the
+      // phone's notification shade (tester round 3 #5).
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.86),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(editing == null ? 'Add Coach' : 'Edit Coach',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+              child: Row(children: [
+                Expanded(
+                  child: Text(editing == null ? 'Add Coach' : 'Edit Coach',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ]),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(20),
+                children: [
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full name')),
               const SizedBox(height: 14),
               TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Specialization')),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: (sportId?.isEmpty ?? true) ? null : sportId,
-                decoration: const InputDecoration(labelText: 'Sport'),
-                isExpanded: true,
+              SmartDropdown<String>(
+                value: (sportId?.isEmpty ?? true) ? '' : sportId,
+                labelText: 'Sport',
                 items: [
                   const DropdownMenuItem(value: '', child: Text('None')),
                   for (final s in SportsCache.instance.rows)
@@ -251,7 +264,7 @@ class _CoachesPageState extends State<CoachesPage> {
               // diverge (chips missing on add).
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Teams assigned', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
+                child: Text('Teams assigned', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: subT(ctx))),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -268,7 +281,14 @@ class _CoachesPageState extends State<CoachesPage> {
                 ],
               ),
               const SizedBox(height: 20),
-              Row(children: [
+                ],
+              ),
+            ),
+            // Buttons pinned under the scroll — always reachable without
+            // hunting through the form (proper pagination of the sheet).
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + MediaQuery.of(ctx).padding.bottom),
+              child: Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
                 const SizedBox(width: 12),
                 Expanded(
@@ -278,8 +298,8 @@ class _CoachesPageState extends State<CoachesPage> {
                   ),
                 ),
               ]),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       ),

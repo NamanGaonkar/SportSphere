@@ -159,10 +159,10 @@ class _ReportsPageState extends State<ReportsPage> {
                 spacing: gap,
                 runSpacing: gap,
                 children: [
-                  SizedBox(width: w, child: _snapshotStat('TEAMS', '$teams', 'Across all sports')),
-                  SizedBox(width: w, child: _snapshotStat('SPORTS PLAYED', '$sportsPlayed', 'Active disciplines')),
-                  SizedBox(width: w, child: _snapshotStat('ATHLETE ENTRIES', '$entries', 'Athlete-sport registrations')),
-                  SizedBox(width: w, child: _snapshotStat('AVG ATTENDANCE', '$avgAtt%', '30-day average')),
+                  SizedBox(width: w, child: _snapshotStat(context, 'TEAMS', '$teams', 'Across all sports')),
+                  SizedBox(width: w, child: _snapshotStat(context, 'SPORTS PLAYED', '$sportsPlayed', 'Active disciplines')),
+                  SizedBox(width: w, child: _snapshotStat(context, 'ATHLETE ENTRIES', '$entries', 'Athlete-sport registrations')),
+                  SizedBox(width: w, child: _snapshotStat(context, 'AVG ATTENDANCE', '$avgAtt%', '30-day average')),
                 ],
               );
             }),
@@ -179,7 +179,9 @@ class _ReportsPageState extends State<ReportsPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F0),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Brand.darkSurfaceAlt
+                              : const Color(0xFFF5F5F0),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Row(
@@ -219,7 +221,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               Expanded(
                                 flex: 2,
                                 child: Text(fmtDate(a['date']?.toString()),
-                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                                    style: TextStyle(fontSize: 11.5, color: subT(context))),
                               ),
                             ],
                           ),
@@ -234,32 +236,47 @@ class _ReportsPageState extends State<ReportsPage> {
 }
 
 const _headStyle = TextStyle(
-    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.black54);
+    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8);
 
-/// Shared dashboard/reports table header style.
-const dashHeadStyle = TextStyle(
-    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.black54);
+/// Shared dashboard/reports table header style (color resolved at build
+/// time — a const black54 was invisible on the dark surface).
+TextStyle dashHeadStyle(BuildContext context) => TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.8,
+    color: Theme.of(context).brightness == Brightness.dark
+        ? Colors.white60
+        : Colors.black54);
 
-/// Orange-tinted snapshot stat (web SnapshotStat parity).
-Widget _snapshotStat(String label, String value, String sub) {
+/// Orange-tinted snapshot stat (web SnapshotStat parity). Dark mode uses a
+/// translucent orange tint over the dark card with lifted ink colors.
+Widget _snapshotStat(BuildContext context, String label, String value, String sub) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF1E7),
+      color: dark ? const Color(0xFF2A190E) : const Color(0xFFFFF1E7),
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Brand.primary.withValues(alpha: 0.25)),
+      border: Border.all(color: Brand.primary.withValues(alpha: dark ? 0.4 : 0.25)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
-                fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1, color: Color(0xFFB25A1F))),
+            style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: dark ? Brand.primaryHover : const Color(0xFFB25A1F))),
         const SizedBox(height: 4),
         Text(value,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.15, color: Color(0xFF1A1A1A))),
+            style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+                color: dark ? Colors.white : const Color(0xFF1A1A1A))),
         const SizedBox(height: 2),
-        Text(sub, style: const TextStyle(fontSize: 11, color: Colors.black45)),
+        Text(sub, style: TextStyle(fontSize: 11, color: subT(context))),
       ],
     ),
   );

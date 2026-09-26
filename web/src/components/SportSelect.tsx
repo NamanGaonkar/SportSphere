@@ -1,8 +1,63 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Box from '@mui/material/Box'
+import { supabase } from '../lib/supabase'
 import { useSports } from '../lib/hooks'
+
+/** Team dropdown scoped to a sport: when a sport is selected (e.g. Cricket)
+ *  only that sport's teams are offered — cross-sport assignment is blocked
+ *  at the UI level on both web and mobile (the DB guard stays as backup). */
+export function TeamSelectScoped({
+  value,
+  onChange,
+  sportId,
+  label = 'Team',
+  allowEmpty = true,
+  emptyLabel = 'None',
+}: {
+  value: string
+  onChange: (v: string) => void
+  sportId: string
+  label?: string
+  allowEmpty?: boolean
+  emptyLabel?: string
+}) {
+  const [teams, setTeams] = useState<{ id: string; name: string; sport_id: string | null }[]>([])
+  useEffect(() => {
+    let alive = true
+    supabase
+      .from('teams')
+      .select('id, name, sport_id')
+      .order('name')
+      .then(({ data }) => {
+        if (alive) setTeams(((data ?? []) as { id: string; name: string; sport_id: string | null }[]))
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  const scoped = useMemo(
+    () => teams.filter((t) => !sportId || t.sport_id === sportId),
+    [teams, sportId],
+  )
+  const valid = scoped.some((t) => t.id === value)
+  return (
+    <TextField
+      select
+      label={label}
+      value={valid ? value : ''}
+      onChange={(e) => onChange(e.target.value)}
+      fullWidth
+      helperText={sportId && scoped.length === 0 ? 'No teams in this sport yet' : undefined}
+    >
+      {allowEmpty && <MenuItem value="">{emptyLabel}</MenuItem>}
+      {scoped.map((t) => (
+        <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+      ))}
+    </TextField>
+  )
+}
 
 /** Sport dropdown fed live from the sports table. Empty value = no sport. */
 export function SportSelect({
@@ -29,6 +84,15 @@ export function SportSelect({
       onChange={(e) => onChange(e.target.value)}
       required={required}
       fullWidth
+      // Cap the menu height so the 21-sport list scrolls inside a bounded
+      // dropdown instead of covering the whole dialog.
+      slotProps={{
+        select: {
+          MenuProps: {
+            slotProps: { paper: { sx: { maxHeight: 320 } } },
+          },
+        },
+      }}
     >
       {allowEmpty && <MenuItem value="">{emptyLabel}</MenuItem>}
       {sports.map((s) => (
@@ -57,6 +121,13 @@ export function SportFilter({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       sx={{ mb: 2, width }}
+      slotProps={{
+        select: {
+          MenuProps: {
+            slotProps: { paper: { sx: { maxHeight: 320 } } },
+          },
+        },
+      }}
     >
       <MenuItem value="">All sports</MenuItem>
       {sports.map((s) => (

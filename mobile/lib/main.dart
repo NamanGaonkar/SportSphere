@@ -90,6 +90,21 @@ class Brand {
   static const darkSurface = Color(0xFF161616); // cards / tables
   static const darkSurfaceAlt = Color(0xFF1F1F1F); // table header, wells
   static const darkBorder = Color(0xFF2A2A2A); // hairlines / input borders
+
+  // Deep status colors (BadgeChip light-mode ink — mirrors web statusColor).
+  static const green = Color(0xFF2E7D32);
+  static const amber = Color(0xFFB26A00);
+  static const red = Color(0xFFC62828);
+  static const blue = Color(0xFF1565C0);
+  static const gray = Color(0xFF757575);
+
+  // Soft orange gradient for the dark-mode sidebar rail (user round 3 #23:
+  // the flat #FF6A13 rail was too punchy; this is the web hero gradient).
+  static const railGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFF9A62), Color(0xFFFFB98A)],
+  );
 }
 
 /// App-only theme mode (web app is untouched). Persisted so the choice
@@ -230,7 +245,7 @@ class _SportSphereAppState extends State<SportSphereApp> {
         secondaryLabelStyle: TextStyle(color: fg, fontSize: 12.5, fontWeight: FontWeight.w600),
         selectedColor: const Color(0x33FF6A13),
         backgroundColor: dark ? Brand.darkSurfaceAlt : const Color(0xFFF3F3EE),
-        checkmarkColor: const Color(0xFFB24A00),
+        checkmarkColor: dark ? Brand.primaryHover : const Color(0xFFB24A00),
         side: BorderSide(color: dark ? Brand.darkBorder : const Color(0xFFDDDDD2)),
         showCheckmark: true,
       ),
@@ -244,6 +259,27 @@ class _SportSphereAppState extends State<SportSphereApp> {
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         textStyle: TextStyle(color: fg, fontSize: 15),
+      ),
+      // Tab bars (Inventory, Vendor & Purchase): unselected labels must be
+      // visible in dark mode (tester round 3 #10, #13).
+      tabBarTheme: TabBarThemeData(
+        labelColor: Brand.primary,
+        unselectedLabelColor: sub,
+        indicatorColor: Brand.primary,
+        dividerColor: dark ? Brand.darkBorder : const Color(0xFFE5E5E0),
+      ),
+      // Native dropdown menus (menu rows) stay readable in dark mode.
+      popupMenuTheme: PopupMenuThemeData(
+        color: dark ? Brand.darkSurfaceAlt : Colors.white,
+        textStyle: TextStyle(fontSize: 14, color: fg),
+      ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: dark ? Brand.darkSurface : Colors.white,
+        headerForegroundColor: fg,
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: dark ? Brand.darkSurface : Colors.white,
+        dialBackgroundColor: dark ? Brand.darkSurfaceAlt : const Color(0xFFF0F0EA),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

@@ -377,7 +377,7 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
                                               fontSize: 12.5,
                                               height: 1.35,
                                               color: Theme.of(context).colorScheme.onSurface
-                                                  .withValues(alpha: 0.75)),
+                                                  .withValues(alpha: 0.85)),
                                         ),
                                       ),
                                     ],
@@ -474,26 +474,25 @@ class _VenuesAdminPageState extends State<VenuesAdminPage> {
               },
             ),
             if (lat != null && lng != null)
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    locCtrl.text.trim().isNotEmpty
-                        ? locCtrl.text.trim()
-                        : '${lat!.toStringAsFixed(5)}, ${lng!.toStringAsFixed(5)}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+              // Just the styled Clear pin button — the address text next to
+              // it duplicated the Location field above (round 3 #8).
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    foregroundColor: const Color(0xFFC62828),
+                    side: const BorderSide(color: Color(0xFFC62828)),
                   ),
-                ),
-                TextButton(
                   onPressed: () => setM(() {
                     lat = null;
                     lng = null;
                     locCtrl.clear();
                   }),
-                  child: const Text('Clear pin'),
+                  icon: const Icon(Icons.location_off_outlined, size: 17),
+                  label: const Text('Clear pin'),
                 ),
-              ]),
+              ),
           ]),
           // Cancel and Save are the SAME style pairing and height — the old
           // text-only Cancel read as a footnote next to the filled button.

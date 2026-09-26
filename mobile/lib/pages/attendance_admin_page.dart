@@ -168,21 +168,22 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
           const PageHead('Attendance & Leave',
               sub: 'View any date. Marking is allowed for today onward.'),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Text('Date',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.black54)),
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Brand.primary)),
               const SizedBox(width: 10),
               Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: DateField(
-                    label: 'View date',
-                    value: _date,
-                    onChanged: (v) => setState(() => _date = v ?? _date),
-                    // Viewing any past date is allowed; the mark buttons are
-                    // disabled for past days below.
-                    firstDate: DateTime(2000),
-                  ),
+                // Full-width date field with a normal height: the old 48px
+                // box + isDense combo truncated the "View date" label and
+                // the picked date (tester round 3 #9).
+                child: DateField(
+                  label: 'View date',
+                  value: _date,
+                  onChanged: (v) => setState(() => _date = v ?? _date),
+                  // Viewing any past date is allowed; the mark buttons are
+                  // disabled for past days below.
+                  firstDate: DateTime(2000),
                 ),
               ),
             ],
@@ -249,7 +250,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                     Text('${r['role'] ?? ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                        style: TextStyle(fontSize: 11.5, color: subT(context))),
                   ],
                 ),
               ),
@@ -261,8 +262,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   child: BadgeChip(status, color: statusColor(status)),
                 )
               else
-                Text('not marked',
-                    style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.4))),
+                Text('not marked', style: TextStyle(fontSize: 12, color: faintT(context))),
             ],
           ),
           const SizedBox(height: 8),
