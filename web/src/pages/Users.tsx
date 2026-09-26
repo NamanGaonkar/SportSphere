@@ -18,6 +18,11 @@ import IconButton from '@mui/material/IconButton'
 import SearchIcon from '@mui/icons-material/Search'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import InputAdornment from '@mui/material/InputAdornment'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined'
+import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import { supabase } from '../lib/supabase'
 import { useRealtimeTable } from '../lib/hooks'
 import {
@@ -35,6 +40,7 @@ type UserRow = {
   phone: string | null
   avatar_url: string | null
   created_at: string
+  deleted_at: string | null
   email?: string | null
 }
 
@@ -64,13 +70,16 @@ export default function Users() {
   // Inline rename dialog (keeps the table cell clean — name is not a form).
   const [renaming, setRenaming] = useState<UserRow | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  // Active / Deleted views — soft-deleted users live in the Deleted tab
+  // where they can be restored or permanently removed.
+  const [tab, setTab] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     const [prof, emails] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, full_name, role, contact_info, phone, avatar_url, created_at')
+        .select('id, full_name, role, contact_info, phone, avatar_url, created_at, deleted_at')
         .order('created_at', { ascending: false }),
       // Auth emails live outside profiles; admin-only RPC surfaces them.
       supabase.rpc('admin_list_emails'),
@@ -134,6 +143,37 @@ export default function Users() {
     load()
   }
 
+  // --- Deletion (tester round 3): soft delete hides the account and blocks
+  // its login; permanent delete removes the profile, roster rows and the
+  // auth login for good. Both are admin-only RPCs on the server.
+  async function softDelete(r: UserRow) {
+    setError(''); setOkMsg('')
+    if (r.role === 'Admin') { setError('The primary Admin account cannot be deleted.'); return }
+    if (!confirm(`Delete ${r.full_name}?\n\nThey will be signed out, hidden from every list and unable to sign in. You can restore them anytime from the Deleted tab.`)) return
+    const { error } = await supabase.rpc('admin_delete_user', { p_user: r.id })
+    if (error) setError(error.message)
+    else { setOkMsg(`${r.full_name} deleted - restore them from the Deleted tab.`); setTab(0); load() }
+  }
+
+  async function restore(r: UserRow) {
+    setError(''); setOkMsg('')
+    const { error } = await supabase.rpc('admin_restore_user', { p_user: r.id })
+    if (error) setError(error.message)
+    else { setOkMsg(`${r.full_name} restored - they can sign in again.`); load() }
+  }
+
+  async function purge(r: UserRow) {
+    setError(''); setOkMsg('')
+    if (r.role === 'Admin') { setError('The primary Admin account cannot be deleted.'); return }
+    if (!confirm(`PERMANENTLY delete ${r.full_name}?`)) return
+    if (!confirm('Final check: their login, profile and all their records (attendance, awards, medical) are removed FOREVER. This cannot be undone.\n\nContinue?')) return
+    const { error } = await supabase.rpc('admin_purge_user', { p_user: r.id })
+    if (error) setError(error.message)
+    else { setOkMsg(`${r.full_name} permanently deleted.`); load() }
+  }
+
+  const deletedCount = rows.filter((r) => r.deleted_at != null).length
+
   return (
     <Box>
       <PageHead
@@ -158,6 +198,12 @@ export default function Users() {
         slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
       />
 
+      {/* Active vs Deleted views. Deleted = soft-deleted accounts, restorable. */}
+      <Tabs value={tab} onChange={(_, v) => { setTab(v); setPage(0) }} sx={{ mb: 2 }}>
+        <Tab label="Active" />
+        <Tab label={deletedCount > 0 ? `Deleted (${deletedCount})` : 'Deleted'} />
+      </Tabs>
+
       <Paper>
         {loading ? (
           <LoadingState />
@@ -173,10 +219,12 @@ export default function Users() {
                     <TableCell sx={{ width: 150 }}>Role</TableCell>
                     <TableCell sx={{ width: 170 }}>Phone</TableCell>
                     <TableCell sx={{ width: 110 }}>Joined</TableCell>
+                    <TableCell align="right" sx={{ width: 130 }}>{tab === 0 ? 'Delete' : 'Restore / Delete'}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filtered
+                    .filter((r) => (tab === 0 ? r.deleted_at == null : r.deleted_at != null))
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((r) => (
                       <TableRow key={r.id} hover>
@@ -230,6 +278,32 @@ export default function Users() {
                         </TableCell>
                         <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap', fontSize: 12.5 }}>
                           {new Date(r.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' })}
+                        </TableCell>
+                        {/* Deletion actions per tab: soft-delete for active
+                            users, restore + permanent delete for deleted. */}
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap', width: 130 }}>
+                          {tab === 0 ? (
+                            r.role !== 'Admin' && (
+                              <Tooltip title="Delete (can be restored)">
+                                <IconButton size="small" color="error" onClick={() => softDelete(r)} aria-label="Delete">
+                                  <DeleteOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )
+                          ) : (
+                            <>
+                              <Tooltip title="Restore - sign-in works again">
+                                <IconButton size="small" color="success" onClick={() => restore(r)} aria-label="Restore">
+                                  <RestoreOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete permanently (cannot be undone)">
+                                <IconButton size="small" color="error" onClick={() => purge(r)} aria-label="Delete permanently">
+                                  <DeleteForeverOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -39,6 +39,8 @@ class _UsersPageState extends State<UsersPage> {
   List<DbRow> _rows = [];
   bool _loading = true;
   String _q = '';
+  // False = Active tab, true = Deleted (soft-deleted accounts).
+  bool _showDeleted = false;
   RealtimeChannel? _channel;
 
   @override
@@ -58,7 +60,7 @@ class _UsersPageState extends State<UsersPage> {
     try {
       final data = await client
           .from('profiles')
-          .select('id, full_name, role, contact_info, phone, avatar_url, created_at, athletes(id), coaches(id), staff(id)')
+          .select('id, full_name, role, contact_info, phone, avatar_url, created_at, deleted_at, athletes(id), coaches(id), staff(id)')
           .order('created_at', ascending: false);
       // Auth emails live outside profiles; admin-only RPC surfaces them.
       final emails = await client.rpc('admin_list_emails');
@@ -78,12 +80,100 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   List<DbRow> get _filtered {
-    if (_q.isEmpty) return _rows;
-    return _rows
+    // Tab first: Active hides soft-deleted users, Deleted shows only them.
+    final tabbed = _rows.where((r) => _showDeleted ? r['deleted_at'] != null : r['deleted_at'] == null).toList();
+    if (_q.isEmpty) return tabbed;
+    return tabbed
         .where((r) => '${r['full_name']} ${r['role']} ${r['contact_info'] ?? ''} ${r['phone'] ?? ''} ${r['email'] ?? ''}'
             .toLowerCase()
             .contains(_q.toLowerCase()))
         .toList();
+  }
+
+  int get _deletedCount => _rows.where((r) => r['deleted_at'] != null).length;
+
+  // --- Deletion (tester round 3): soft delete hides the account and bans
+  // its login; restore undoes both; permanent delete removes profile,
+  // roster rows and the auth login FOR GOOD. Server-side admin RPCs.
+  Future<void> _softDelete(DbRow r) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete user'),
+        content: Text(
+            '${r['full_name']} will be signed out, hidden from every list and unable to sign in. You can restore them anytime from the Deleted tab.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFC62828)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await client.rpc('admin_delete_user', params: {'p_user': r['id']});
+      if (mounted) showSnack(context, 'Deleted - restore from the Deleted tab.');
+      _load();
+    } catch (e) {
+      if (mounted) showSnack(context, 'Delete failed: $e', error: true);
+    }
+  }
+
+  Future<void> _restore(DbRow r) async {
+    try {
+      await client.rpc('admin_restore_user', params: {'p_user': r['id']});
+      if (mounted) showSnack(context, 'Restored - they can sign in again.');
+      _load();
+    } catch (e) {
+      if (mounted) showSnack(context, 'Restore failed: $e', error: true);
+    }
+  }
+
+  Future<void> _purge(DbRow r) async {
+    final first = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete permanently'),
+        content: Text('PERMANENTLY delete ${r['full_name']}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFC62828)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (first != true) return;
+    if (!mounted) return;
+    final second = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Final check'),
+        content: const Text(
+            'Their login, profile and all their records (attendance, awards, medical) are removed FOREVER. This cannot be undone.\n\nContinue?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFC62828)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (second != true) return;
+    try {
+      await client.rpc('admin_purge_user', params: {'p_user': r['id']});
+      if (mounted) showSnack(context, 'Permanently deleted.');
+      _load();
+    } catch (e) {
+      if (mounted) showSnack(context, 'Delete failed: $e', error: true);
+    }
   }
 
   Future<void> _setRole(DbRow r, String role) async {
@@ -267,6 +357,18 @@ class _UsersPageState extends State<UsersPage> {
               isDense: true,
             ),
           ),
+          const SizedBox(height: 8),
+          // Active / Deleted tabs — parity with the web User Management.
+          TabBar(
+            tabs: [
+              const Tab(text: 'Active'),
+              Tab(text: _deletedCount > 0 ? 'Deleted ($_deletedCount)' : 'Deleted'),
+            ],
+            labelColor: Brand.primary,
+            unselectedLabelColor: subT(context),
+            indicatorColor: Brand.primary,
+            onTap: (i) => setState(() => _showDeleted = i == 1),
+          ),
           const SizedBox(height: 12),
           Card(
             child: _loading
@@ -290,19 +392,32 @@ class _UsersPageState extends State<UsersPage> {
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _roleColor('${r['role']}')),
                                       ),
                               ),
-                              title: Text('${r['full_name']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              title: Text('${r['full_name']}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
                               subtitle: Text('${r['email'] ?? '-'} - ${r['phone'] ?? r['contact_info'] ?? 'no phone'}',
-                                  style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                              trailing: SizedBox(
-                                width: 148,
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: '${r['role']}',
-                                  isDense: true,
-                                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-                                  items: [for (final x in _roles) DropdownMenuItem(value: x, child: Text(x, style: const TextStyle(fontSize: 12)))],
-                                  onChanged: (v) => v == null ? null : _setRole(r, v),
-                                ),
-                              ),
+                                  style: TextStyle(fontSize: 12, color: subT(context)), overflow: TextOverflow.ellipsis),
+                              trailing: _showDeleted
+                                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        tooltip: 'Restore - sign-in works again',
+                                        icon: const Icon(Icons.restore, size: 20, color: Color(0xFF2E7D32)),
+                                        onPressed: () => _restore(r),
+                                      ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        tooltip: 'Delete permanently',
+                                        icon: const Icon(Icons.delete_forever_outlined, size: 20, color: Color(0xFFC62828)),
+                                        onPressed: () => _purge(r),
+                                      ),
+                                    ])
+                                  : SizedBox(
+                                      width: 148,
+                                      child: SmartDropdown<String>(
+                                        value: '${r['role']}',
+                                        items: [for (final x in _roles) DropdownMenuItem(value: x, child: Text(x, style: const TextStyle(fontSize: 12)))],
+                                        onChanged: (v) => v == null ? null : _setRole(r, v),
+                                      ),
+                                    ),
                               onTap: () => _openUserSheet(r),
                             ),
                         ],
@@ -345,6 +460,24 @@ class _UsersPageState extends State<UsersPage> {
               onTap: () {
                 Navigator.pop(ctx);
                 _showRolePicker(r);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_remove_outlined, color: Color(0xFFC62828)),
+              title: const Text('Delete (can be restored)', style: TextStyle(color: Color(0xFFC62828))),
+              onTap: () {
+                Navigator.pop(ctx);
+                _softDelete(r);
+              },
+            ),
+            // Permanent delete: also reachable for an ACTIVE user, but it
+            // asks one extra confirmation before the unrecoverable purge.
+            ListTile(
+              leading: const Icon(Icons.delete_forever_outlined, color: Color(0xFFC62828)),
+              title: const Text('Delete permanently', style: TextStyle(color: Color(0xFFC62828))),
+              onTap: () {
+                Navigator.pop(ctx);
+                _purge(r);
               },
             ),
             const SizedBox(height: 8),

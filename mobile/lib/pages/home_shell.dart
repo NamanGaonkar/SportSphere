@@ -847,6 +847,48 @@ class _DashboardHomeState extends State<DashboardHome> {
             );
           }),
           const SizedBox(height: 16),
+          // Ops strip — parity with the web dashboard: the two alert numbers
+          // used to be buried in small cards at the very bottom, effectively
+          // invisible on the phone. Deep-colored tappable StatCards right
+          // under the main row put them on first screen.
+          LayoutBuilder(builder: (context, constraints) {
+            const gap = 16.0;
+            final w = (constraints.maxWidth - gap) / 2;
+            final notCleared = _med.where((m) => m['cleared'] == false).map((m) => m['athlete_id']).toSet().length;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                SizedBox(
+                  width: w,
+                  child: InkWell(
+                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Vendors & Purchases'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: StatCard(
+                      label: 'POs AWAITING DELIVERY',
+                      value: '$_pendingPO',
+                      sub: _pendingPO > 0 ? 'Marked Ordered - tap to review' : 'Nothing on order',
+                      variant: 4,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: w,
+                  child: InkWell(
+                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Medical'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: StatCard(
+                      label: 'ATHLETES NOT CLEARED',
+                      value: '$notCleared',
+                      sub: notCleared > 0 ? 'From latest medical records' : 'All athletes cleared',
+                      variant: 1,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: 16),
           _Card(
             title: 'Recent Matches',
             child: _matches.isEmpty
@@ -1089,33 +1131,7 @@ class _DashboardHomeState extends State<DashboardHome> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _Card(
-            title: 'Medical',
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: widget.onOpenPage == null ? null : () => widget.onOpenPage!('Medical'),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${_med.where((m) => m['cleared'] == false).length}',
-                            style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: _med.any((m) => m['cleared'] == false)
-                                    ? const Color(0xFFC62828)
-                                    : subText(context))),
-                        Text('Athletes not cleared', style: TextStyle(fontSize: 11.5, color: subText(context))),
-                      ]),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+
         ],
       ),
     );

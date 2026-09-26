@@ -23,6 +23,17 @@ async function load(): Promise<Sport[]> {
   return cache
 }
 
+/**
+ * Synchronous sport-name lookup against the shared cache. Safe to call
+ * inside useCallback([]) closures (page loaders) that would otherwise
+ * capture a STALE sports list — this always reads the latest cache, so a
+ * chart that loads before the sports arrive can be re-run later and get
+ * real names instead of "No sport" for every row.
+ */
+export function sportNameById(id: string | null | undefined): string {
+  return cache?.find((s) => s.id === id)?.name ?? ''
+}
+
 /** Live list of sports from the DB — single source of truth, never hardcoded. */
 export function useSports(): { sports: Sport[]; byId: (id: string | null | undefined) => string; refresh: () => Promise<void> } {
   const [sports, setSports] = useState<Sport[]>(cache ?? [])
