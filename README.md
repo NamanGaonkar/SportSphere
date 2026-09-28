@@ -1,5 +1,9 @@
 # SportSphere — Enterprise Sports Organization Management Platform
 
+## Created By
+
+**Naman Gaonkar · Kartik Naik · Himanshu Karpe · Pratham Gawas**
+
 > **SportSphere** is a multi-role, unified enterprise sports organization and academy management platform. It combines a **React 18 + Material-UI (MUI v5)** Web Administration Console with a high-performance **Flutter (Material 3)** Cross-Platform Mobile Application, backed by a scalable **Supabase (PostgreSQL 15+)** cloud infrastructure with Row Level Security (RLS) and real-time data synchronization.
 
 ---
